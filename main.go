@@ -17,35 +17,44 @@ var (
 	DATABASE = os.Getenv("DB_NAME")
 )
 
-type Database struct {
+type BaseHandler struct {
 	Conn *sql.DB
 }
 
-func Initialize(username, password, database string) (Database, error) {
-	db := Database{}
+func NewBaseHandler(db *sql.DB) *BaseHandler {
+	return &BaseHandler{ db }
+}
+
+const tableCreationQuery = `CREATE TABLE IF NOT EXISTS tickets
+(
+    id SERIAL,
+    created_at TIMESTAMP DEFAULT now(),
+	updated_at TIMESTAMP DEFAULT now(),
+	customer VARCHAR(20) NOT NULL,
+    topic VARCHAR(20) NOT NULL,
+	contents TEXT NOT NULL,
+    CONSTRAINT pk_tickets PRIMARY KEY (id)
+)`
+
+func Initialize() (*sql.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		HOST, PORT, USERNAME, PASSWORD, DATABASE)
 	conn, err := sql.Open("postgres", dsn)
-	if err != nil {
-		return db, err
-	}
-
-	db.Conn = conn
-	err = db.Conn.Ping()
-	if err != nil {
-		return db, err
-	}
-
+	if err != nil { return nil, err }
+	if err := conn.Ping(); err != nil { return nil, err }
 	log.Println("Database connection established")
-	return db, nil
+	return conn, nil
 }
 
 func main() {
-	db, err := Initialize(os.Getenv("username"),
-		os.Getenv("password"),
-		os.Getenv("database"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(db)
+	conn, err := Initialize()
+	if err != nil { log.Fatal(err) }
+	
+	h := NewBaseHandler(conn)
+
+	_, err = h.Conn.Exec(tableCreationQuery)
+	if err != nil { log.Fatal(err) }
+	
+	defer h.Conn.Close()
+	defer fmt.Println("Closing DB connection.")
 }
