@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"net/http"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -17,8 +19,17 @@ var (
 	DATABASE = os.Getenv("DB_NAME")
 )
 
+var (
+	SERVER_HOST = os.Getenv("SERVER_HOST")
+	SERVER_PORT = os.Getenv("SERVER_PORT")
+)
+
 type BaseHandler struct {
 	Conn *sql.DB
+}
+
+func (h *BaseHandler) Pong(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(time.Now().String()))
 }
 
 func NewBaseHandler(db *sql.DB) *BaseHandler {
@@ -42,19 +53,31 @@ func Initialize() (*sql.DB, error) {
 	conn, err := sql.Open("postgres", dsn)
 	if err != nil { return nil, err }
 	if err := conn.Ping(); err != nil { return nil, err }
-	log.Println("Database connection established")
+	log.Println("Database connection established.")
+
 	return conn, nil
 }
 
 func main() {
+	log.Println("Initializing DB connection.")
 	conn, err := Initialize()
 	if err != nil { log.Fatal(err) }
 	
 	h := NewBaseHandler(conn)
 
+	log.Println("Creating tickets relation in DB.")
 	_, err = h.Conn.Exec(tableCreationQuery)
 	if err != nil { log.Fatal(err) }
 	
+	log.Println("Registering routes.")
+	http.HandleFunc("/time", h.Pong)
+
+	s := &http.Server{
+		Addr: fmt.Sprintf("%s:%s", SERVER_HOST, SERVER_PORT),
+	}
+	log.Printf("Starting server on port %s", SERVER_PORT)
+	s.ListenAndServe()
+
 	defer h.Conn.Close()
-	defer fmt.Println("Closing DB connection.")
+	defer log.Println("Closing DB connection.")
 }
