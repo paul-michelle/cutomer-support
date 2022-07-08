@@ -18,20 +18,59 @@ var (
 	DATABASE = os.Getenv("DB_NAME")
 )
 
-const tableCreationQuery = `CREATE TABLE IF NOT EXISTS tickets
+const (
+	createTableUsersStmt = `
+CREATE TABLE IF NOT EXISTS users
+(
+    id SERIAL,
+    created_at TIMESTAMP DEFAULT now(),
+	email VARCHAR(64) NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+	username VARCHAR(64) NOT NULL,
+	is_staff BOOLEAN DEFAULT FALSE,
+	is_superuser BOOLEAN DEFAULT FALSE,
+    CONSTRAINT pk_users PRIMARY KEY (id)
+);`
+	createStatusTypeStmt = `
+CREATE OR REPLACE FUNCTION create_ticket_status_type() RETURNS integer AS $$
+DECLARE type_already_exists INTEGER;
+	BEGIN
+		SELECT into type_already_exists (SELECT 1 FROM pg_type WHERE typname = 'status');
+		IF type_already_exists IS NULL THEN
+			CREATE TYPE status AS ENUM ('resolved', 'unresolved', 'pending', 'unknown');
+		END IF;
+		RETURN type_already_exists;
+	END;
+	$$ LANGUAGE plpgsql;
+SELECT create_ticket_status_type();
+DROP function create_ticket_status_type();`
+
+	createTableTicketsStmt = `
+CREATE TABLE IF NOT EXISTS tickets
 (
     id SERIAL,
     created_at TIMESTAMP DEFAULT now(),
 	updated_at TIMESTAMP DEFAULT now(),
-	customer VARCHAR(20) NOT NULL,
+	author INTEGER REFERENCES users (id),
     topic VARCHAR(20) NOT NULL,
-	contents TEXT NOT NULL,
+	status STATUS,
     CONSTRAINT pk_tickets PRIMARY KEY (id)
-)`
-
-const (
+);`
+	createTableMessagesStmt = `
+CREATE TABLE IF NOT EXISTS messages
+(
+    id SERIAL,
+    created_at TIMESTAMP DEFAULT now(),
+	author INTEGER REFERENCES users (id),
+	text TEXT,
+	ticket INTEGER REFERENCES tickets (id),
+	CONSTRAINT pk_messages PRIMARY KEY (id)
+);`
 	createTicketQuery  = "INSERT INTO tickets (customer, topic, contents) VALUES ($1, $2, $3) RETURNING id"
 	getAllTicketsQuery = "SELECT * FROM tickets ORDER BY created_at ASC"
+	createUser         = `
+	INSERT INTO users (email, password, username) 
+	VALUES ($1, crypt($2, gen_salt('bf', 8)), $3);`
 )
 
 type Ticket struct {
@@ -62,9 +101,29 @@ func Initialize() (*sql.DB, error) {
 	return conn, nil
 }
 
-func CreateTables(conn *sql.DB) (err error) {
-	_, err = conn.Exec(tableCreationQuery)
-	return err
+func CreateRelations(conn *sql.DB) (err error) {
+	log.Println("Creating table 'users'.")
+	_, err = conn.Exec(createTableUsersStmt)
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.Exec(createStatusTypeStmt)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Creating table 'tickets'.")
+	_, err = conn.Exec(createTableTicketsStmt)
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.Exec(createTableMessagesStmt)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func CreateTicket(conn *sql.DB, customer, topic, contents string) (lastInsertId int, err error) {

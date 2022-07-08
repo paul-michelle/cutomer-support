@@ -23,7 +23,7 @@ func main() {
 	}
 
 	log.Println("Creating relations in DB.")
-	err = db.CreateTables(conn)
+	err = db.CreateRelations(conn)
 	if err != nil {
 		log.Fatal(err)
 	}
