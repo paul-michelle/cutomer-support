@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 	"net/http"
-	"time"
 
+	"github.com/paul-michelle/golang-sql/controllers"
 	_ "github.com/lib/pq"
 )
 
@@ -23,18 +23,6 @@ var (
 	SERVER_HOST = os.Getenv("SERVER_HOST")
 	SERVER_PORT = os.Getenv("SERVER_PORT")
 )
-
-type BaseHandler struct {
-	Conn *sql.DB
-}
-
-func (h *BaseHandler) Pong(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte(time.Now().String()))
-}
-
-func NewBaseHandler(db *sql.DB) *BaseHandler {
-	return &BaseHandler{ db }
-}
 
 const tableCreationQuery = `CREATE TABLE IF NOT EXISTS tickets
 (
