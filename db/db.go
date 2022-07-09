@@ -19,6 +19,7 @@ var (
 )
 
 const (
+	enableCryptoStmt = "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
 	createTableUsersStmt = `
 CREATE TABLE IF NOT EXISTS users
 (
@@ -66,11 +67,12 @@ CREATE TABLE IF NOT EXISTS messages
 	ticket INTEGER REFERENCES tickets (id),
 	CONSTRAINT pk_messages PRIMARY KEY (id)
 );`
-	createTicketQuery  = "INSERT INTO tickets (customer, topic, contents) VALUES ($1, $2, $3) RETURNING id"
-	getAllTicketsQuery = "SELECT * FROM tickets ORDER BY created_at ASC"
-	createUser         = `
-	INSERT INTO users (email, password, username) 
-	VALUES ($1, crypt($2, gen_salt('bf', 8)), $3);`
+	createTicketStmt	= "INSERT INTO tickets (customer, topic, contents) VALUES ($1, $2, $3) RETURNING id"
+	getAllTicketsStmt	= "SELECT * FROM tickets ORDER BY created_at ASC"
+	createUserStmt		= `
+	INSERT INTO users (email, password, username, is_staff, is_superuser) 
+	VALUES ($1, crypt($2, gen_salt('bf', 8)), $3, $4, $5) RETURNING id;`
+	checkUserExistsStmt = "SELECT exists(SELECT 1 FROM users WHERE email=$1 and password=crypt($2, password));"
 )
 
 type Ticket struct {
@@ -102,7 +104,12 @@ func Initialize() (*sql.DB, error) {
 }
 
 func CreateRelations(conn *sql.DB) (err error) {
-	log.Println("Creating table 'users'.")
+	_, err = conn.Exec(enableCryptoStmt)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Creating table 'users' if not exists.")
 	_, err = conn.Exec(createTableUsersStmt)
 	if err != nil {
 		return err
@@ -113,12 +120,13 @@ func CreateRelations(conn *sql.DB) (err error) {
 		return err
 	}
 
-	log.Println("Creating table 'tickets'.")
+	log.Println("Creating table 'tickets' if not exists.")
 	_, err = conn.Exec(createTableTicketsStmt)
 	if err != nil {
 		return err
 	}
 
+	log.Println("Creating table 'messages' if not exists.")
 	_, err = conn.Exec(createTableMessagesStmt)
 	if err != nil {
 		return err
@@ -127,12 +135,12 @@ func CreateRelations(conn *sql.DB) (err error) {
 }
 
 func CreateTicket(conn *sql.DB, customer, topic, contents string) (lastInsertId int, err error) {
-	err = conn.QueryRow(createTicketQuery, customer, topic, contents).Scan(&lastInsertId)
+	err = conn.QueryRow(createTicketStmt, customer, topic, contents).Scan(&lastInsertId)
 	return lastInsertId, err
 }
 
 func GetAllTickets(conn *sql.DB) (tickets TicketsList, err error) {
-	rows, err := conn.Query(getAllTicketsQuery)
+	rows, err := conn.Query(getAllTicketsStmt)
 	if err != nil {
 		return tickets, err
 	}
@@ -148,4 +156,15 @@ func GetAllTickets(conn *sql.DB) (tickets TicketsList, err error) {
 		tickets.Tickets = append(tickets.Tickets, ticket)
 	}
 	return tickets, nil
+}
+
+func CreateUser(conn *sql.DB, email, password, username string,
+	is_staff, is_superuser bool) (lastInsertId int, err error) {
+	err = conn.QueryRow(createUserStmt, email, password, username, is_staff, is_superuser).Scan(&lastInsertId)
+	return lastInsertId, err
+}
+
+func UserExists(conn *sql.DB, email, password string) (exists bool, err error) {
+	err = conn.QueryRow(checkUserExistsStmt, email, password).Scan(&exists)
+	return exists, err
 }

@@ -31,6 +31,8 @@ func main() {
 	log.Println("Registering routes.")
 	h := controllers.NewBaseHandler(conn)
 	http.HandleFunc("/time", h.Pong)
+	http.HandleFunc("/users", h.CreateUser)
+	http.HandleFunc("/login", h.LogIn)
 	http.HandleFunc("/tickets", h.TicketsListAllOrCreateOne)
 
 	log.Printf("Starting server at %s on port %s", SERVER_HOST, SERVER_PORT)
