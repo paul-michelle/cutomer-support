@@ -34,7 +34,7 @@ func main() {
 	http.HandleFunc("/users", h.CreateUser)
 	http.HandleFunc("/login", h.LogIn)
 	http.HandleFunc("/refresh", h.RefreshTJwtToken)
-	http.HandleFunc("/tickets", h.TicketsListAllOrCreateOne)
+	http.Handle("/tickets", controllers.JWTMiddleWare(h.TicketsListAllOrCreateOne))
 
 	log.Printf("Starting server at %s on port %s", SERVER_HOST, SERVER_PORT)
 	s := &http.Server{Addr: fmt.Sprintf("%s:%s", SERVER_HOST, SERVER_PORT)}

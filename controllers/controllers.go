@@ -19,8 +19,8 @@ import (
 
 const (
 	passwordMinLength                   = 8
-	tokenTtlMinutes                     = 30
-	maxMinsBeforeExpTokenCanBeRefreshed = 29
+	tokenTtlMinutes                     = 5
+	maxMinsBeforeExpTokenCanBeRefreshed = 1
 	cookieName                          = "token"
 )
 
@@ -234,11 +234,11 @@ func (h *BaseHandler) LogIn(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func createTokenForUser(user db.User, ttl time.Time) (etokenString string, err error) {
+func createTokenForUser(user db.User, ttl time.Time) (tokenString string, err error) {
 	claims := &Claims{
-		Username: user.Username,
-		Email: user.Email,
-		IsStaff: user.IsStaff,
+		Username:    user.Username,
+		Email:       user.Email,
+		IsStaff:     user.IsStaff,
 		IsSuperuser: user.IsSuperuser,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(ttl),
@@ -261,7 +261,7 @@ func (h *BaseHandler) RefreshTJwtToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	claims := &Claims{}
-	token, tokenParseErr := jwt.ParseWithClaims(tokenString.Value, claims,
+	_, validErr := jwt.ParseWithClaims(tokenString.Value, claims,
 		func(tkn *jwt.Token) (interface{}, error) {
 			if _, ok := tkn.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, wrongSigningMethodError
@@ -269,29 +269,69 @@ func (h *BaseHandler) RefreshTJwtToken(w http.ResponseWriter, r *http.Request) {
 			return jwtKey, nil
 		})
 
-	if tokenParseErr != nil {
-		log.Println(tokenParseErr)
-		reason := "Token parse error"
-		if tokenParseErr == jwt.ErrSignatureInvalid {
-			reason = "Invalid signature."
+	if validErr != nil {
+		validErrParsed, _ := validErr.(*jwt.ValidationError)
+		if validErrParsed.Errors != jwt.ValidationErrorExpired {
+			http.Error(w, "Token invalid", http.StatusUnauthorized)
+			return
 		}
-		if tokenParseErr == wrongSigningMethodError {
-			reason = "Wrong singing method."
-		}
-		http.Error(w, reason, http.StatusUnauthorized)
-		return
 	}
 
-	if !token.Valid {
-		http.Error(w, "Token invalid", http.StatusUnauthorized)
-		return
-	}
-
-	expirationTime := claims.RegisteredClaims.ExpiresAt.Time
-	timeBeforeExpiration := expirationTime.Sub(time.Now())
+	timeBeforeExpiration := claims.RegisteredClaims.ExpiresAt.Time.Sub(time.Now())
 	if timeBeforeExpiration > maxMinsBeforeExpTokenCanBeRefreshed*time.Minute {
 		http.Error(w, fmt.Sprintf("Token age should be at least %d minutes to run refreshment.",
 			tokenTtlMinutes-maxMinsBeforeExpTokenCanBeRefreshed), http.StatusBadRequest)
 		return
 	}
+
+	ttl := time.Now().Add(tokenTtlMinutes * time.Minute)
+	user := db.User{
+		Username:    claims.Username,
+		Email:       claims.Email,
+		IsStaff:     claims.IsStaff,
+		IsSuperuser: claims.IsSuperuser,
+	}
+	newTokenString, err := createTokenForUser(user, ttl)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Please try again later.", http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:    cookieName,
+		Value:   newTokenString,
+		Expires: ttl,
+	})
+}
+
+func JWTMiddleWare(next func(res http.ResponseWriter, req *http.Request)) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		tokenString, errorNoCookie := req.Cookie(cookieName)
+		if errorNoCookie != nil {
+			http.Error(res, "Token missing in 'Cookie' headers.", http.StatusUnauthorized)
+			return
+		}
+
+		claims := &Claims{}
+		_, validErr := jwt.ParseWithClaims(tokenString.Value, claims,
+			func(tkn *jwt.Token) (interface{}, error) {
+				if _, ok := tkn.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, wrongSigningMethodError
+				}
+				return jwtKey, nil
+			})
+
+		if validErr != nil {
+			msg := "Token invalid."
+			errParsed, _ := validErr.(*jwt.ValidationError)
+			if errParsed.Errors == jwt.ValidationErrorExpired {
+				msg = "Token expired."
+			}
+			http.Error(res, msg, http.StatusUnauthorized)
+			return
+		}
+
+		next(res, req)
+	})
 }
