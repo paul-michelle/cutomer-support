@@ -67,12 +67,14 @@ CREATE TABLE IF NOT EXISTS messages
 	ticket INTEGER REFERENCES tickets (id),
 	CONSTRAINT pk_messages PRIMARY KEY (id)
 );`
-	createTicketStmt	= "INSERT INTO tickets (customer, topic, contents) VALUES ($1, $2, $3) RETURNING id"
+	createTicketStmt	= "INSERT INTO tickets (author, topic, status) VALUES ($1, $2, $3) RETURNING id"
 	getAllTicketsStmt	= "SELECT * FROM tickets ORDER BY created_at ASC"
 	createUserStmt		= `
 	INSERT INTO users (email, password, username, is_staff, is_superuser) 
 	VALUES ($1, crypt($2, gen_salt('bf', 8)), $3, $4, $5) RETURNING id;`
 	checkUserExistsStmt = "SELECT exists(SELECT 1 FROM users WHERE email=$1 and password=crypt($2, password));"
+	getUserDetailsStmt = `
+	SELECT id, username, email, is_staff, is_superuser FROM  users WHERE email=$1 and password=crypt($2, password);`
 )
 
 type Ticket struct {
@@ -83,6 +85,15 @@ type Ticket struct {
 	Topic     string    `json:"topic"`
 	Contents  string    `json:"contents"`
 }
+
+type User struct {
+	ID        	int     `json:"id"`
+	Username	string	`json: "username"`
+	Email		string	`json: "email"`
+	IsStaff		bool	`json: "isStaff"`
+	IsSuperuser bool  	`json: "isSuperuser"`
+}
+
 type TicketsList struct {
 	Tickets []Ticket `json:"tickets"`
 }
@@ -134,8 +145,8 @@ func CreateRelations(conn *sql.DB) (err error) {
 	return nil
 }
 
-func CreateTicket(conn *sql.DB, customer, topic, contents string) (lastInsertId int, err error) {
-	err = conn.QueryRow(createTicketStmt, customer, topic, contents).Scan(&lastInsertId)
+func CreateTicket(conn *sql.DB, author int, topic string) (lastInsertId int, err error) {
+	err = conn.QueryRow(createTicketStmt, author, topic, "pending").Scan(&lastInsertId)
 	return lastInsertId, err
 }
 
@@ -167,4 +178,10 @@ func CreateUser(conn *sql.DB, email, password, username string,
 func UserExists(conn *sql.DB, email, password string) (exists bool, err error) {
 	err = conn.QueryRow(checkUserExistsStmt, email, password).Scan(&exists)
 	return exists, err
+}
+
+func GetUserDetails(conn *sql.DB, email, password string) (user User, err error) {
+	err = conn.QueryRow(getUserDetailsStmt, email, password).Scan(
+		&user.ID, &user.Username, &user.Email, &user.IsStaff, &user.IsSuperuser)
+	return user, err
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"db-queries/db"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,10 +18,16 @@ import (
 )
 
 const (
-	passwordMinLength = 8
-	tokenTtlMinutes = 30
+	passwordMinLength                   = 8
+	tokenTtlMinutes                     = 30
+	maxMinsBeforeExpTokenCanBeRefreshed = 29
+	cookieName                          = "token"
 )
-var jwtKey = []byte(os.Getenv("JWT_KEY"))
+
+var (
+	wrongSigningMethodError = errors.New("Unexpected signing method")
+	jwtKey                  = []byte(os.Getenv("JWT_KEY"))
+)
 
 type BaseHandler struct {
 	Conn *sql.DB
@@ -31,13 +38,13 @@ func NewBaseHandler(db *sql.DB) *BaseHandler {
 }
 
 type TicketDetails struct {
-	Customer string `json: "customer"`
+	Author   int    `json: "author"`
 	Topic    string `json: "topic"`
 	Contents string `json: "contents"`
 }
 
 type UserDetails struct {
-	IsStuff     bool   `json: "isStuff"`
+	IsStaff     bool   `json: "isStaff"`
 	IsSuperuser bool   `json: "isSuperuser"`
 	Email       string `json: "email"`
 	Password    string `json: "password"`
@@ -45,12 +52,14 @@ type UserDetails struct {
 }
 
 type Credentials struct {
-	Email    	string `json: "email"`
-	Password    string `json: "password"`
-
+	Email    string `json: "email"`
+	Password string `json: "password"`
 }
 type Claims struct {
-	Email string
+	Username    string `json: "username"`
+	Email       string `json: "email"`
+	IsStaff     bool   `json: "isStaff"`
+	IsSuperuser bool   `json: "isSuperuser"`
 	jwt.RegisteredClaims
 }
 
@@ -83,12 +92,12 @@ func (h *BaseHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ticket.Customer == "" || ticket.Topic == "" || ticket.Contents == "" {
+	if ticket.Author == 0 || ticket.Topic == "" || ticket.Contents == "" {
 		http.Error(w, "Missing fields in payload", http.StatusBadRequest)
 		return
 	}
 
-	id, err := db.CreateTicket(h.Conn, ticket.Customer, ticket.Topic, ticket.Contents)
+	id, err := db.CreateTicket(h.Conn, ticket.Author, ticket.Topic)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Please try again later.", http.StatusInternalServerError)
@@ -119,7 +128,7 @@ func (h *BaseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed.", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	var user UserDetails
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
@@ -128,7 +137,7 @@ func (h *BaseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, emailParseError := mail.ParseAddress(user.Email)
-	if emailParseError != nil ||  user.Password == "" || user.Username == "" {
+	if emailParseError != nil || user.Password == "" || user.Username == "" {
 		http.Error(w, "Username, password and valid email address required.", http.StatusBadRequest)
 		return
 	}
@@ -139,7 +148,7 @@ func (h *BaseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	staffStatus := false
-	if user.IsStuff {
+	if user.IsStaff {
 		reqToken := r.Header.Get("Authorization")
 		if reqToken == "" {
 			http.Error(w, "Token missing.", http.StatusUnauthorized)
@@ -153,7 +162,7 @@ func (h *BaseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 
 		token := strings.TrimSpace(splitToken[1])
-		if token != os.Getenv("STUFF_TOKEN") {
+		if token != os.Getenv("STAFF_TOKEN") {
 			http.Error(w, "Token invalid", http.StatusUnauthorized)
 			return
 		}
@@ -199,19 +208,19 @@ func (h *BaseHandler) LogIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userExists, err := db.UserExists(h.Conn, creds.Email, creds.Password)
+	user, err := db.GetUserDetails(h.Conn, creds.Email, creds.Password)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Please try again later.", http.StatusInternalServerError)
 		return
 	}
-	if !userExists {
+	if user.Email == "" {
 		http.Error(w, "User with specified credentials not found.", http.StatusNotFound)
 		return
 	}
 
 	ttl := time.Now().Add(tokenTtlMinutes * time.Minute)
-	tokenString, err := createTokenForUser(creds.Email, ttl)
+	tokenString, err := createTokenForUser(user, ttl)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Please try again later.", http.StatusInternalServerError)
@@ -219,19 +228,70 @@ func (h *BaseHandler) LogIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name: "token",
-		Value: tokenString,
+		Name:    cookieName,
+		Value:   tokenString,
 		Expires: ttl,
 	})
 }
 
-func createTokenForUser(email string, ttl time.Time) (etokenString string, err error) {
+func createTokenForUser(user db.User, ttl time.Time) (etokenString string, err error) {
 	claims := &Claims{
-		Email: email,
-		RegisteredClaims: jwt.RegisteredClaims{ 
+		Username: user.Username,
+		Email: user.Email,
+		IsStaff: user.IsStaff,
+		IsSuperuser: user.IsSuperuser,
+		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(ttl),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtKey)
+}
+
+func (h *BaseHandler) RefreshTJwtToken(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method Not Allowed.", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tokenString, errorNoCookie := r.Cookie(cookieName)
+	if errorNoCookie != nil {
+		http.Error(w, "Token missing in 'Cookie' headers.", http.StatusUnauthorized)
+		return
+	}
+
+	claims := &Claims{}
+	token, tokenParseErr := jwt.ParseWithClaims(tokenString.Value, claims,
+		func(tkn *jwt.Token) (interface{}, error) {
+			if _, ok := tkn.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, wrongSigningMethodError
+			}
+			return jwtKey, nil
+		})
+
+	if tokenParseErr != nil {
+		log.Println(tokenParseErr)
+		reason := "Token parse error"
+		if tokenParseErr == jwt.ErrSignatureInvalid {
+			reason = "Invalid signature."
+		}
+		if tokenParseErr == wrongSigningMethodError {
+			reason = "Wrong singing method."
+		}
+		http.Error(w, reason, http.StatusUnauthorized)
+		return
+	}
+
+	if !token.Valid {
+		http.Error(w, "Token invalid", http.StatusUnauthorized)
+		return
+	}
+
+	expirationTime := claims.RegisteredClaims.ExpiresAt.Time
+	timeBeforeExpiration := expirationTime.Sub(time.Now())
+	if timeBeforeExpiration > maxMinsBeforeExpTokenCanBeRefreshed*time.Minute {
+		http.Error(w, fmt.Sprintf("Token age should be at least %d minutes to run refreshment.",
+			tokenTtlMinutes-maxMinsBeforeExpTokenCanBeRefreshed), http.StatusBadRequest)
+		return
+	}
 }
