@@ -1,14 +1,17 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v4"
 )
 
+var wrongSigningMethodError = errors.New("Unexpected signing method")
+
 func JWTMiddleWare(next func(res http.ResponseWriter, req *http.Request)) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		tokenString, errorNoCookie := req.Cookie(cookieName)
+		tokenString, errorNoCookie := req.Cookie(COOKIE_NAME)
 		if errorNoCookie != nil {
 			http.Error(res, "Token missing in 'Cookie' headers.", http.StatusUnauthorized)
 			return
@@ -20,7 +23,7 @@ func JWTMiddleWare(next func(res http.ResponseWriter, req *http.Request)) http.H
 				if _, ok := tkn.Method.(*jwt.SigningMethodHMAC); !ok {
 					return nil, wrongSigningMethodError
 				}
-				return jwtKey, nil
+				return JWT_KEY, nil
 			})
 
 		if validErr != nil {
