@@ -9,7 +9,7 @@ import (
 
 var wrongSigningMethodError = errors.New("Unexpected signing method")
 
-func JWTMiddleWare(next func(res http.ResponseWriter, req *http.Request)) http.Handler {
+func JWTMiddleWare(next func(res http.ResponseWriter, req *AuthenticatedRequest)) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		tokenString, errorNoCookie := req.Cookie(COOKIE_NAME)
 		if errorNoCookie != nil {
@@ -36,6 +36,13 @@ func JWTMiddleWare(next func(res http.ResponseWriter, req *http.Request)) http.H
 			return
 		}
 
-		next(res, req)
+		enrichedReruest := &AuthenticatedRequest{req, Requester{
+			IsStaff:     claims.IsStaff,
+			IsSuperuser: claims.IsSuperuser,
+			Email:       claims.Email,
+			Username:    claims.Username,
+		},
+		}
+		next(res, enrichedReruest)
 	})
 }

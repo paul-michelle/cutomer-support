@@ -7,12 +7,14 @@ import (
 )
 
 type Requester struct {
-	IsStaff, IsSuperuser bool
-	Email, Username      string
+	Username    string
+	Email       string
+	IsStaff     bool
+	IsSuperuser bool
 }
-type RichRequest struct {
+type AuthenticatedRequest struct {
 	*http.Request
-	requester Requester
+	user Requester
 }
 
 type BaseHandler struct {

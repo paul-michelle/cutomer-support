@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS tickets
     id SERIAL,
     created_at TIMESTAMP DEFAULT now(),
 	updated_at TIMESTAMP DEFAULT now(),
-	author INTEGER REFERENCES users (id),
+	author VARCHAR(64) REFERENCES users (email),
     topic VARCHAR(20) NOT NULL,
 	status STATUS,
     CONSTRAINT pk_tickets PRIMARY KEY (id)
@@ -57,39 +57,36 @@ CREATE TABLE IF NOT EXISTS messages
 (
     id SERIAL,
     created_at TIMESTAMP DEFAULT now(),
-	author INTEGER REFERENCES users (id),
+	author VARCHAR(64) REFERENCES users (email),
 	text TEXT,
 	ticket INTEGER REFERENCES tickets (id),
 	CONSTRAINT pk_messages PRIMARY KEY (id)
 );`
-	createTicketStmt  = "INSERT INTO tickets (author, topic, status) VALUES ($1, $2, $3) RETURNING id"
-	getAllTicketsStmt = "SELECT * FROM tickets ORDER BY created_at ASC"
-	createUserStmt    = `
+	createTicketStmt          = "INSERT INTO tickets (author, topic, status) VALUES ($1, $2, $3) RETURNING id"
+	getTicketsUserCreatedStmt = "SELECT * FROM tickets WHERE author=$1 ORDER BY created_at ASC"
+	getAllTicketsStmt         = "SELECT * FROM tickets ORDER BY created_at ASC"
+	createUserStmt            = `
 	INSERT INTO users (email, password, username, is_staff, is_superuser) 
 	VALUES ($1, crypt($2, gen_salt('bf', 8)), $3, $4, $5);`
-	getUserDetailsStmt  = `
+	getUserDetailsStmt = `
 	SELECT id, username, email, is_staff, is_superuser FROM  users WHERE email=$1 and password=crypt($2, password);`
 )
 
 type Ticket struct {
-	ID        int       `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Customer  string    `json:"customer"`
-	Topic     string    `json:"topic"`
-	Contents  string    `json:"contents"`
+	ID     int
+	CrtdAt time.Time
+	UpdAt  time.Time
+	Author string
+	Topic  string
+	Status string
 }
 
 type User struct {
-	ID          int    `json:"id"`
-	Username    string `json:"username"`
-	Email       string `json:"email"`
-	IsStaff     bool   `json:"isStaff"`
-	IsSuperuser bool   `json:"isSuperuser"`
-}
-
-type TicketsList struct {
-	Tickets []Ticket `json:"tickets"`
+	ID          int
+	Username    string
+	Email       string
+	IsStaff     bool
+	IsSuperuser bool
 }
 
 func Initialize(dsn *DSN) (*sql.DB, error) {
@@ -144,21 +141,29 @@ func CreateTicket(conn *sql.DB, author int, topic string) (lastInsertId int, err
 	return lastInsertId, err
 }
 
-func GetAllTickets(conn *sql.DB) (tickets TicketsList, err error) {
-	rows, err := conn.Query(getAllTicketsStmt)
-	if err != nil {
-		return tickets, err
+func GetTicketsForUser(conn *sql.DB, email string, isStaff, isSuperuser bool) (tickets []Ticket, err error) {
+	var rows *sql.Rows
+	switch {
+	case isStaff || isSuperuser:
+		rows, err = conn.Query(getAllTicketsStmt)
+		if err != nil {
+			return tickets, err
+		}
+	default:
+		rows, err = conn.Query(getTicketsUserCreatedStmt, email)
+		if err != nil {
+			return tickets, err
+		}
 	}
 
 	for rows.Next() {
 		var ticket Ticket
-		err := rows.Scan(&ticket.ID, &ticket.CreatedAt, &ticket.UpdatedAt,
-			&ticket.Customer, &ticket.Topic, &ticket.Contents)
+		err := rows.Scan(&ticket.ID, &ticket.CrtdAt, &ticket.UpdAt, &ticket.Author, &ticket.Topic, &ticket.Status)
 		if err != nil {
 			return tickets, err
 		}
 
-		tickets.Tickets = append(tickets.Tickets, ticket)
+		tickets = append(tickets, ticket)
 	}
 	return tickets, nil
 }
@@ -166,7 +171,7 @@ func GetAllTickets(conn *sql.DB) (tickets TicketsList, err error) {
 func CreateUser(conn *sql.DB, email, password, username string,
 	is_staff, is_superuser bool) error {
 	_, err := conn.Exec(createUserStmt, email, password, username, is_staff, is_superuser)
-	return  err
+	return err
 }
 
 func GetUserDetails(conn *sql.DB, email, password string) (user User, err error) {

@@ -12,27 +12,27 @@ type TicketDetails struct {
 	Contents string `json:"contents"`
 }
 
-func (h *BaseHandler) TicketsListAllOrCreateOne(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		h.GetAllTickets(w, r)
+func (h *BaseHandler) TicketsListAllOrCreateOne(w http.ResponseWriter, authReq *AuthenticatedRequest) {
+	if authReq.Method == "GET" {
+		h.GetAllTickets(w, authReq)
 		return
 	}
-	if r.Method == "POST" {
-		h.CreateTicket(w, r)
+	if authReq.Method == "POST" {
+		// h.CreateTicket(w, r)
 		return
 	}
 	http.Error(w, "Method Not Allowed.", http.StatusMethodNotAllowed)
 }
 
-func (h *BaseHandler) GetAllTickets(w http.ResponseWriter, r *http.Request) {
-	tickets, err := db.GetAllTickets(h.Conn)
+func (h *BaseHandler) GetAllTickets(w http.ResponseWriter, authReq *AuthenticatedRequest) {
+	tickets, err := db.GetTicketsForUser(h.Conn, authReq.user.Email, authReq.user.IsStaff, authReq.user.IsSuperuser)
 	if err != nil {
 		http.Error(w, "Please try again later.", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(tickets.Tickets)
+	json.NewEncoder(w).Encode(tickets)
 }
 
 func (h *BaseHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
