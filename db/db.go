@@ -66,8 +66,7 @@ CREATE TABLE IF NOT EXISTS messages
 	getAllTicketsStmt = "SELECT * FROM tickets ORDER BY created_at ASC"
 	createUserStmt    = `
 	INSERT INTO users (email, password, username, is_staff, is_superuser) 
-	VALUES ($1, crypt($2, gen_salt('bf', 8)), $3, $4, $5) RETURNING id;`
-	checkUserExistsStmt = "SELECT exists(SELECT 1 FROM users WHERE email=$1 and password=crypt($2, password));"
+	VALUES ($1, crypt($2, gen_salt('bf', 8)), $3, $4, $5);`
 	getUserDetailsStmt  = `
 	SELECT id, username, email, is_staff, is_superuser FROM  users WHERE email=$1 and password=crypt($2, password);`
 )
@@ -165,14 +164,9 @@ func GetAllTickets(conn *sql.DB) (tickets TicketsList, err error) {
 }
 
 func CreateUser(conn *sql.DB, email, password, username string,
-	is_staff, is_superuser bool) (lastInsertId int, err error) {
-	err = conn.QueryRow(createUserStmt, email, password, username, is_staff, is_superuser).Scan(&lastInsertId)
-	return lastInsertId, err
-}
-
-func UserExists(conn *sql.DB, email, password string) (exists bool, err error) {
-	err = conn.QueryRow(checkUserExistsStmt, email, password).Scan(&exists)
-	return exists, err
+	is_staff, is_superuser bool) error {
+	_, err := conn.Exec(createUserStmt, email, password, username, is_staff, is_superuser)
+	return  err
 }
 
 func GetUserDetails(conn *sql.DB, email, password string) (user User, err error) {

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/mail"
 	"os"
@@ -99,7 +98,6 @@ func (h *BaseHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 
 	id, err := db.CreateTicket(h.Conn, ticket.Author, ticket.Topic)
 	if err != nil {
-		log.Println(err)
 		http.Error(w, "Please try again later.", http.StatusInternalServerError)
 		return
 	}
@@ -114,7 +112,6 @@ func (h *BaseHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 func (h *BaseHandler) GetAllTickets(w http.ResponseWriter, r *http.Request) {
 	tickets, err := db.GetAllTickets(h.Conn)
 	if err != nil {
-		log.Println(err)
 		http.Error(w, "Please try again later.", http.StatusInternalServerError)
 		return
 	}
@@ -170,24 +167,19 @@ func (h *BaseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		staffStatus = true
 	}
 
-	id, err := db.CreateUser(h.Conn, user.Email, user.Password, user.Username, staffStatus, false)
-	if err != nil {
+	if err := db.CreateUser(h.Conn, user.Email, user.Password, user.Username, staffStatus, false); err != nil {
 		pqErr := err.(*pq.Error)
 		if pqErr.Code.Name() == "unique_violation" {
 			http.Error(w, "User with specified email already exists.", http.StatusBadRequest)
 			return
 		}
 	}
-
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	resp := make(map[string]int)
-	resp["id"] = id
-	json.NewEncoder(w).Encode(resp)
 }
 
 func (h *BaseHandler) LogIn(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
+		return
 	}
 
 	if r.Method != "POST" {
@@ -210,11 +202,6 @@ func (h *BaseHandler) LogIn(w http.ResponseWriter, r *http.Request) {
 
 	user, err := db.GetUserDetails(h.Conn, creds.Email, creds.Password)
 	if err != nil {
-		log.Println(err)
-		http.Error(w, "Please try again later.", http.StatusInternalServerError)
-		return
-	}
-	if user.Email == "" {
 		http.Error(w, "User with specified credentials not found.", http.StatusNotFound)
 		return
 	}
@@ -222,7 +209,6 @@ func (h *BaseHandler) LogIn(w http.ResponseWriter, r *http.Request) {
 	ttl := time.Now().Add(tokenTtlMinutes * time.Minute)
 	tokenString, err := createTokenForUser(user, ttl)
 	if err != nil {
-		log.Println(err)
 		http.Error(w, "Please try again later.", http.StatusInternalServerError)
 		return
 	}
