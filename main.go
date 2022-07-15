@@ -8,16 +8,34 @@ import (
 
 	"db-queries/controllers"
 	"db-queries/db"
+
+	"github.com/joho/godotenv"
 )
 
-var (
-	SERVER_HOST = os.Getenv("SERVER_HOST")
-	SERVER_PORT = os.Getenv("SERVER_PORT")
-)
+func GetEnv(key, defaultValue string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultValue
+	}
+	return val
+}
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Unable to parse .env file.")
+	}
+	var ()
 	log.Println("Initializing DB connection.")
-	conn, err := db.Initialize()
+	conn, err := db.Initialize(
+		&db.DSN{
+			HOST:     os.Getenv("DB_HOST"),
+			PORT:     os.Getenv("DB_PORT"),
+			USERNAME: os.Getenv("DB_USER"),
+			PASSWORD: os.Getenv("DB_PASSWORD"),
+			DATABASE: os.Getenv("DB_NAME"),
+		},
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,11 +51,15 @@ func main() {
 	http.HandleFunc("/time", h.Pong)
 	http.HandleFunc("/users", h.CreateUser)
 	http.HandleFunc("/login", h.LogIn)
-	http.HandleFunc("/refresh", h.RefreshTJwtToken)
 	http.Handle("/tickets", controllers.JWTMiddleWare(h.TicketsListAllOrCreateOne))
 
-	log.Printf("Starting server at %s on port %s", SERVER_HOST, SERVER_PORT)
-	s := &http.Server{Addr: fmt.Sprintf("%s:%s", SERVER_HOST, SERVER_PORT)}
+	log.Println("Initializing HTTP server.")
+	host := GetEnv("SERVER_HOST", "127.0.0.1")
+	port := GetEnv("SERVER_PORT", "8089")
+	servAddr := fmt.Sprintf("%s:%s", host, port)
+	s := &http.Server{Addr: servAddr}
+
+	log.Printf("Starting server at %s", servAddr)
 	log.Fatal(s.ListenAndServe())
 
 	defer h.Conn.Close()

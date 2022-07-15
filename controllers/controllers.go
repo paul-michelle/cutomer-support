@@ -38,28 +38,28 @@ func NewBaseHandler(db *sql.DB) *BaseHandler {
 }
 
 type TicketDetails struct {
-	Author   int    `json: "author"`
-	Topic    string `json: "topic"`
-	Contents string `json: "contents"`
+	Author   int    `json:"author"`
+	Topic    string `json:"topic"`
+	Contents string `json:"contents"`
 }
 
 type UserDetails struct {
-	IsStaff     bool   `json: "isStaff"`
-	IsSuperuser bool   `json: "isSuperuser"`
-	Email       string `json: "email"`
-	Password    string `json: "password"`
-	Username    string `json: "username"`
+	IsStaff     bool   `json:"isStaff"`
+	IsSuperuser bool   `json:"isSuperuser"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	Username    string `json:"username"`
 }
 
 type Credentials struct {
-	Email    string `json: "email"`
-	Password string `json: "password"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 type Claims struct {
-	Username    string `json: "username"`
-	Email       string `json: "email"`
-	IsStaff     bool   `json: "isStaff"`
-	IsSuperuser bool   `json: "isSuperuser"`
+	Username    string `json:"username"`
+	Email       string `json:"email"`
+	IsStaff     bool   `json:"isStaff"`
+	IsSuperuser bool   `json:"isSuperuser"`
 	jwt.RegisteredClaims
 }
 
@@ -246,92 +246,4 @@ func createTokenForUser(user db.User, ttl time.Time) (tokenString string, err er
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtKey)
-}
-
-func (h *BaseHandler) RefreshTJwtToken(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method Not Allowed.", http.StatusMethodNotAllowed)
-		return
-	}
-
-	tokenString, errorNoCookie := r.Cookie(cookieName)
-	if errorNoCookie != nil {
-		http.Error(w, "Token missing in 'Cookie' headers.", http.StatusUnauthorized)
-		return
-	}
-
-	claims := &Claims{}
-	_, validErr := jwt.ParseWithClaims(tokenString.Value, claims,
-		func(tkn *jwt.Token) (interface{}, error) {
-			if _, ok := tkn.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, wrongSigningMethodError
-			}
-			return jwtKey, nil
-		})
-
-	if validErr != nil {
-		validErrParsed, _ := validErr.(*jwt.ValidationError)
-		if validErrParsed.Errors != jwt.ValidationErrorExpired {
-			http.Error(w, "Token invalid", http.StatusUnauthorized)
-			return
-		}
-	}
-
-	timeBeforeExpiration := claims.RegisteredClaims.ExpiresAt.Time.Sub(time.Now())
-	if timeBeforeExpiration > maxMinsBeforeExpTokenCanBeRefreshed*time.Minute {
-		http.Error(w, fmt.Sprintf("Token age should be at least %d minutes to run refreshment.",
-			tokenTtlMinutes-maxMinsBeforeExpTokenCanBeRefreshed), http.StatusBadRequest)
-		return
-	}
-
-	ttl := time.Now().Add(tokenTtlMinutes * time.Minute)
-	user := db.User{
-		Username:    claims.Username,
-		Email:       claims.Email,
-		IsStaff:     claims.IsStaff,
-		IsSuperuser: claims.IsSuperuser,
-	}
-	newTokenString, err := createTokenForUser(user, ttl)
-	if err != nil {
-		log.Println(err)
-		http.Error(w, "Please try again later.", http.StatusInternalServerError)
-		return
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:    cookieName,
-		Value:   newTokenString,
-		Expires: ttl,
-	})
-}
-
-func JWTMiddleWare(next func(res http.ResponseWriter, req *http.Request)) http.Handler {
-	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		tokenString, errorNoCookie := req.Cookie(cookieName)
-		if errorNoCookie != nil {
-			http.Error(res, "Token missing in 'Cookie' headers.", http.StatusUnauthorized)
-			return
-		}
-
-		claims := &Claims{}
-		_, validErr := jwt.ParseWithClaims(tokenString.Value, claims,
-			func(tkn *jwt.Token) (interface{}, error) {
-				if _, ok := tkn.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, wrongSigningMethodError
-				}
-				return jwtKey, nil
-			})
-
-		if validErr != nil {
-			msg := "Token invalid."
-			errParsed, _ := validErr.(*jwt.ValidationError)
-			if errParsed.Errors == jwt.ValidationErrorExpired {
-				msg = "Token expired."
-			}
-			http.Error(res, msg, http.StatusUnauthorized)
-			return
-		}
-
-		next(res, req)
-	})
 }

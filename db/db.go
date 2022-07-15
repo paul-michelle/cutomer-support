@@ -4,22 +4,17 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	_ "github.com/lib/pq"
 )
 
-var (
-	HOST     = os.Getenv("DB_HOST")
-	PORT     = os.Getenv("DB_PORT")
-	USERNAME = os.Getenv("DB_USER")
-	PASSWORD = os.Getenv("DB_PASSWORD")
-	DATABASE = os.Getenv("DB_NAME")
-)
+type DSN struct {
+	HOST, PORT, USERNAME, PASSWORD, DATABASE string
+}
 
 const (
-	enableCryptoStmt = "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
+	enableCryptoStmt     = "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
 	createTableUsersStmt = `
 CREATE TABLE IF NOT EXISTS users
 (
@@ -67,13 +62,13 @@ CREATE TABLE IF NOT EXISTS messages
 	ticket INTEGER REFERENCES tickets (id),
 	CONSTRAINT pk_messages PRIMARY KEY (id)
 );`
-	createTicketStmt	= "INSERT INTO tickets (author, topic, status) VALUES ($1, $2, $3) RETURNING id"
-	getAllTicketsStmt	= "SELECT * FROM tickets ORDER BY created_at ASC"
-	createUserStmt		= `
+	createTicketStmt  = "INSERT INTO tickets (author, topic, status) VALUES ($1, $2, $3) RETURNING id"
+	getAllTicketsStmt = "SELECT * FROM tickets ORDER BY created_at ASC"
+	createUserStmt    = `
 	INSERT INTO users (email, password, username, is_staff, is_superuser) 
 	VALUES ($1, crypt($2, gen_salt('bf', 8)), $3, $4, $5) RETURNING id;`
 	checkUserExistsStmt = "SELECT exists(SELECT 1 FROM users WHERE email=$1 and password=crypt($2, password));"
-	getUserDetailsStmt = `
+	getUserDetailsStmt  = `
 	SELECT id, username, email, is_staff, is_superuser FROM  users WHERE email=$1 and password=crypt($2, password);`
 )
 
@@ -87,22 +82,22 @@ type Ticket struct {
 }
 
 type User struct {
-	ID        	int     `json:"id"`
-	Username	string	`json: "username"`
-	Email		string	`json: "email"`
-	IsStaff		bool	`json: "isStaff"`
-	IsSuperuser bool  	`json: "isSuperuser"`
+	ID          int    `json:"id"`
+	Username    string `json:"username"`
+	Email       string `json:"email"`
+	IsStaff     bool   `json:"isStaff"`
+	IsSuperuser bool   `json:"isSuperuser"`
 }
 
 type TicketsList struct {
 	Tickets []Ticket `json:"tickets"`
 }
 
-func Initialize() (*sql.DB, error) {
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		HOST, PORT, USERNAME, PASSWORD, DATABASE)
+func Initialize(dsn *DSN) (*sql.DB, error) {
+	connString := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		dsn.HOST, dsn.PORT, dsn.USERNAME, dsn.PASSWORD, dsn.DATABASE)
 
-	conn, err := sql.Open("postgres", dsn)
+	conn, err := sql.Open("postgres", connString)
 	if err != nil {
 		return nil, err
 	}
