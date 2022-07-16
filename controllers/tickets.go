@@ -4,24 +4,24 @@ import (
 	"db-queries/db"
 	"encoding/json"
 	"net/http"
+
+	"github.com/lib/pq"
 )
 
 type TicketDetails struct {
-	Author   int    `json:"author"`
-	Topic    string `json:"topic"`
-	Contents string `json:"contents"`
+	Topic string `json:"topic"`
+	Text  string `json:"text"`
 }
 
 func (h *BaseHandler) TicketsListAllOrCreateOne(w http.ResponseWriter, authReq *AuthenticatedRequest) {
-	if authReq.Method == "GET" {
+	switch {
+	case authReq.Method == "GET":
 		h.GetAllTickets(w, authReq)
-		return
+	case authReq.Method == "POST":
+		h.CreateTicket(w, authReq)
+	default:
+		http.Error(w, "Method Not Allowed.", http.StatusMethodNotAllowed)
 	}
-	if authReq.Method == "POST" {
-		// h.CreateTicket(w, r)
-		return
-	}
-	http.Error(w, "Method Not Allowed.", http.StatusMethodNotAllowed)
 }
 
 func (h *BaseHandler) GetAllTickets(w http.ResponseWriter, authReq *AuthenticatedRequest) {
@@ -30,31 +30,37 @@ func (h *BaseHandler) GetAllTickets(w http.ResponseWriter, authReq *Authenticate
 		http.Error(w, "Please try again later.", http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(tickets)
 }
 
-func (h *BaseHandler) CreateTicket(w http.ResponseWriter, r *http.Request) {
-	if r.Body == nil {
+func (h *BaseHandler) CreateTicket(w http.ResponseWriter, authReq *AuthenticatedRequest) {
+	if authReq.Body == nil {
 		http.Error(w, "Payload expected.", http.StatusBadRequest)
 		return
 	}
 
 	var ticket TicketDetails
-	err := json.NewDecoder(r.Body).Decode(&ticket)
+	err := json.NewDecoder(authReq.Body).Decode(&ticket)
 	if err != nil {
 		http.Error(w, "Invalid payload.", http.StatusBadRequest)
 		return
 	}
 
-	if ticket.Author == 0 || ticket.Topic == "" || ticket.Contents == "" {
-		http.Error(w, "Missing fields in payload", http.StatusBadRequest)
+	if ticket.Topic == "" || ticket.Text == "" {
+		http.Error(w, "Missing fields in payload: expected topic and text.", http.StatusBadRequest)
 		return
 	}
 
-	id, err := db.CreateTicket(h.Conn, ticket.Author, ticket.Topic)
+	id, err := db.CreateTicket(h.Conn, authReq.user.Email, ticket.Topic, ticket.Text)
 	if err != nil {
+		pqErr := err.(*pq.Error)
+		if pqErr.Code.Name() == db.VALUE_TOO_LONG_ERR_CODE_NAME {
+			http.Error(w, "Provided values are exceeding max chars limit.", http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "Please try again later.", http.StatusInternalServerError)
 		return
 	}

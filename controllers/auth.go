@@ -14,7 +14,7 @@ import (
 var JWT_KEY = []byte(os.Getenv("JWT_KEY"))
 
 const COOKIE_NAME = "token"
-const TOKEN_TTL_MINS = 5
+const TOKEN_TTL_MINS = 30
 
 type Credentials struct {
 	Email    string `json:"email"`

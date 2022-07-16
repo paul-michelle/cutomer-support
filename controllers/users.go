@@ -71,7 +71,7 @@ func (h *BaseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	if err := db.CreateUser(h.Conn, user.Email, user.Password, user.Username, staffStatus, false); err != nil {
 		pqErr := err.(*pq.Error)
-		if pqErr.Code.Name() == "unique_violation" {
+		if pqErr.Code.Name() == db.UNIQUE_VIOLATION_ERR_CODE_NAME {
 			http.Error(w, "User with specified email already exists.", http.StatusBadRequest)
 			return
 		}
