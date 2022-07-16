@@ -22,12 +22,19 @@ type UserDetails struct {
 	Username    string `json:"username"`
 }
 
-func (h *BaseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+func (h *BaseHandler) UsersListAllOrCreateOne(w http.ResponseWriter, req *http.Request) {
+	switch {
+	case req.Method == "GET":
+		handler := JWTMiddleWare(h.GetAllUsers)
+		handler.ServeHTTP(w, req)
+	case req.Method == "POST":
+		h.CreateUser(w, req)
+	default:
 		http.Error(w, "Method Not Allowed.", http.StatusMethodNotAllowed)
-		return
 	}
+}
 
+func (h *BaseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var user UserDetails
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
@@ -77,4 +84,19 @@ func (h *BaseHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *BaseHandler) GetAllUsers(w http.ResponseWriter, authReq *AuthenticatedRequest) {
+	if authReq.user.IsStaff || authReq.user.IsSuperuser {
+		users, err := db.GetAllUsers(h.Conn)
+		if err != nil {
+			http.Error(w, "Please try again later.", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(users)
+		return
+	}
+	http.Error(w, "No permissions to perform this action.", http.StatusUnauthorized)
 }

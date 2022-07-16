@@ -40,7 +40,7 @@ const (
 	SELECT create_ticket_status_type();
 	DROP function create_ticket_status_type();`
 
-	createTableTicketsStmt = `
+	CREATE_TABLE_TICKETS_STMT = `
 	CREATE TABLE IF NOT EXISTS tickets
 	(
 		id SERIAL,
@@ -100,7 +100,7 @@ func CreateRelations(conn *sql.DB) (err error) {
 	}
 
 	log.Println("Creating table 'tickets' if not exists.")
-	_, err = conn.Exec(createTableTicketsStmt)
+	_, err = conn.Exec(CREATE_TABLE_TICKETS_STMT)
 	if err != nil {
 		return err
 	}

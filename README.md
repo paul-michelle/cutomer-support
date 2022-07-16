@@ -35,13 +35,38 @@ Authorization: Bearer <Secret here>
 ```
 201 Created || 405 Method Not Allowed || 401 Unauthorized (when creating stuff member) || 400 Bad Request with error details.
 
-Is is only a staff member or a superuser who can get the list of all users via:
+Is is only a staff member or a superuser who can get the list of all users (ordered DESC by the number of submitted tickets) via:
 ```
 GET /users
 ```
 The endpoint returns:
 ```
-
+[
+    {
+        "id": 2,
+        "created_at": "2022-07-16T07:26:15.592378Z",
+        "username": "michelle",
+        "email": "user@post.io",
+        "is_staff": false,
+        "tickets_count": 3
+    },
+    {
+        "id": 1,
+        "created_at": "2022-07-15T19:16:52.332915Z",
+        "username": "michelle",
+        "email": "anotheruser@post.io",
+        "is_staff": false,
+        "tickets_count": 2
+    },
+    {
+        "id": 3,
+        "created_at": "2022-07-16T07:30:25.527118Z",
+        "username": "michelle",
+        "email": "staffuser@post.io",
+        "is_staff": true,
+        "tickets_count": 0
+    }
+]
 ```
 #### Superuser considerations
 For safety reasons, any other fields added to the request body, incl. isSuperuser, will be ignored.

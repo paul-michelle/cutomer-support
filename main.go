@@ -49,7 +49,7 @@ func main() {
 	log.Println("Registering routes.")
 	h := controllers.NewBaseHandler(conn)
 	http.HandleFunc("/time", h.Pong)
-	http.HandleFunc("/users", h.CreateUser)
+	http.HandleFunc("/users", h.UsersListAllOrCreateOne)
 	http.HandleFunc("/login", h.LogIn)
 	http.Handle("/tickets", controllers.JWTMiddleWare(h.TicketsListAllOrCreateOne))
 
