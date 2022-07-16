@@ -19,12 +19,12 @@ const (
 )
 
 type Ticket struct {
-	ID     int
-	CrtdAt time.Time
-	UpdAt  time.Time
-	Author string
-	Topic  string
-	Status string
+	ID     int       `json:"id"`
+	CrtdAt time.Time `json:"created_at"`
+	UpdAt  time.Time `json:"updated_at"`
+	Author string    `json:"author"`
+	Topic  string    `json:"topic"`
+	Status string    `json:"status"`
 }
 
 func CreateTicket(conn *sql.DB, email, topic, text string) (lastInsertId int, err error) {

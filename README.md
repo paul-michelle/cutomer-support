@@ -40,7 +40,9 @@ Is is only a staff member or a superuser who can get the list of all users (orde
 GET /users
 ```
 The endpoint returns:
+
 ```
+Status 200 OK
 [
     {
         "id": 2,
@@ -68,6 +70,8 @@ The endpoint returns:
     }
 ]
 ```
+In case of failure: 405 Method Not Allowed || 401 Unauthorized (if not isStaff or isSuperuser) ||500 Internal Server Error (error reading from the database)
+
 #### Superuser considerations
 For safety reasons, any other fields added to the request body, incl. isSuperuser, will be ignored.
 Superusers are currently not to be created the way common users and staff are.
@@ -103,7 +107,7 @@ Succesful response:
     "id": 10
 }
 ```
-Other possible responses: 405 Method Not Allowed || 401 Unauthorized (no or invalid jwt) || 400 Bad Request with error details || || 500 Internal Server Error (error when writing to the db.)
+Other possible responses: 405 Method Not Allowed || 401 Unauthorized (no or invalid jwt) || 400 Bad Request with error details || 500 Internal Server Error (error when writing to the db.)
 
 To get all the tickets (all user's tickets for common user and a list of all existing tickets for staff member of superuser):
 ```
@@ -114,37 +118,67 @@ Response:
 200 OK
 [
     {
-        "ID": 1,
-        "CrtdAt": "2022-07-16T07:12:30.676834Z",
-        "UpdAt": "2022-07-16T07:12:30.676834Z",
-        "Author": "postman33@mpost.io",
-        "Topic": "new instances",
-        "Status": "pending"
+        "id": 1,
+        "created_at": "2022-07-16T07:12:30.676834Z",
+        "updated_at": "2022-07-16T07:12:30.676834Z",
+        "author": "postman33@mpost.io",
+        "topic": "new instances",
+        "status": "pending"
     },
     {
-        "ID": 2,
-        "CrtdAt": "2022-07-16T07:13:58.008489Z",
-        "UpdAt": "2022-07-16T07:13:58.008489Z",
-        "Author": "postman33@mpost.io",
-        "Topic": "new discount",
-        "Status": "pending"
+        "id": 2,
+        "created_at": "2022-07-16T07:13:58.008489Z",
+        "updated_at": "2022-07-16T07:13:58.008489Z",
+        "author": "postman33@mpost.io",
+        "topic": "new discount",
+        "status": "pending"
     },
 ]
 ```
 Other possible responses: 405 Method Not Allowed || 401 Unauthorized (no or invalid jwt) || || 500 Internal Server Error (err when reading from the database)
 
+To get info on a particular ticket the users hits.
+```
+GET /tickets/{id}
+```
+In case the ticket exists and belongs to the user (or in case it is a  request from a staff member):
+```
+COMPLETE ME!!!
+```
+
+To change ticket status to "resolved" (which is the ONLY update that can be done to a ticket remotely):
+```
+PUT/PATCH /tickets/{id}
+{
+    "status": "resolved"
+}
+```
+### Messaging
+When the ticket is first registered, its text goes to the messages table. Each message in this relation
+references a user (via email) and a ticket (pk).
+
+To get the conversation on a certain ticket the users goes for:
+```
+GET /tickets/{id}
+```
+
+### Tickets status considerations
+Since the ticket status is the main benchmark of the whole logic, the staff members should not 
+be allowed to call the ticket "resolved" unless a response message from a staff member has been
+registered for this tickets.
+
+The ticket's author, on the contrary, may 'close' the ticket at any point of time.
+
 ### Flow
 If not specified, jwt needed for actions.
 
 ##### For common user:
-
 1. Create a user: POST /users (no jwt)
 2. Login to set jwt token as cookie: POST /login (no jwt)
 3. Create a couple of tickets: POST /tickets
 4. List all tickets belonging to the user: GET /tickets
 
 ##### For staff user:
-
 1. Create a user  isStaff set to true: POST /users (no jwt, but bearer token NB!)
 2. Login to set jwt token as cookie: POST /login (no jwt)
 3. List all the tickets: GET /tickets
