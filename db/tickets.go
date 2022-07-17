@@ -31,9 +31,6 @@ type Ticket struct {
 	Status string    `json:"status"`
 }
 
-type Message struct {
-}
-
 func CreateTicket(conn *sql.DB, email, topic, text string) (lastInsertId int, err error) {
 	err = conn.QueryRow(CREATE_TICKET_STMT, email, topic, DEFAULT_TICKET_STATUS, text, DEFAULT_MSG_TYPE).Scan(&lastInsertId)
 	return lastInsertId, err
@@ -86,8 +83,4 @@ func UpdateTicket(conn *sql.DB, id, status string) bool {
 		return false
 	}
 	return true
-}
-
-func GetMessagesForTicket(conn *sql.DB, id string) []Message {
-	return nil
 }

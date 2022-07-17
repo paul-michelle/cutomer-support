@@ -197,12 +197,20 @@ Each message in this relation references a user (via email) and a ticket (pk).
 A message has got a message type: one of "request", "response", "other". 
 When a ticket is first registered, its text goes to the messages table as a message of type "request".
 
-To get the conversation on a certain ticket the users goes for:
+To get the conversation on a certain ticket the users goes for: GET /tickets/{id}/messages.
 ```
-GET /tickets/{id}/messages
+200 OK
+[
+    {
+        "created_at": "2022-07-17T19:00:44.314775Z",
+        "type": "request",
+        "text": "a long text with the issue here"
+    }
+]
 ```
+Other possible responses: 401 Unauthorized (no or invalid jwt) || 405 Method Not Allowed || 404 Not Found.
 
-To add a new 
+
 ```
 
 ```

@@ -3,7 +3,6 @@ package controllers
 import (
 	"db-queries/db"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -117,8 +116,7 @@ func (h *BaseHandler) TicketsDetailedView(res http.ResponseWriter, authReq *Auth
 		ticketId := strings.Split(authReq.URL.Path, "/")[ID_POSITION_IN_URL_PATH]
 		switch {
 		case authReq.Method == "GET":
-			fmt.Println(ticketId)
-			return
+			h.GetMessagesForTicket(ticketId, res, authReq)
 		case authReq.Method == "POST":
 			return
 		default:
