@@ -7,14 +7,15 @@ import (
 
 const (
 	DEFAULT_TICKET_STATUS         = "pending"
+	DEFAULT_MSG_TYPE              = "request"
 	GET_ALL_TICKETS_STMT          = "SELECT id, created_at, updated_at, author, topic, status FROM tickets ORDER BY created_at ASC"
 	GET_TICKETS_OF_THIS_USER_STMT = "SELECT id, created_at, updated_at, topic, status FROM tickets WHERE author=$1 ORDER BY created_at ASC"
 	CREATE_TICKET_STMT            = `
 	WITH insert_to_tickets AS 
 	(INSERT INTO tickets (author, topic, status) 
 	VALUES ($1, $2, $3) RETURNING id)
-    INSERT INTO messages (author, ticket, text) 
-	VALUES ($1, (SELECT id FROM insert_to_tickets), $4) RETURNING id;
+    INSERT INTO messages (author, ticket, text, type) 
+	VALUES ($1, (SELECT id FROM insert_to_tickets), $4, $5) RETURNING id;
 `
 	GET_TICKET_STMT              = "SELECT created_at, updated_at, author, topic, status FROM tickets WHERE id=$1"
 	GET_TICKET_OF_THIS_USER_STMT = "SELECT created_at, updated_at, topic, status FROM tickets WHERE id=$1 and author=$2"
@@ -30,8 +31,11 @@ type Ticket struct {
 	Status string    `json:"status"`
 }
 
+type Message struct {
+}
+
 func CreateTicket(conn *sql.DB, email, topic, text string) (lastInsertId int, err error) {
-	err = conn.QueryRow(CREATE_TICKET_STMT, email, topic, DEFAULT_TICKET_STATUS, text).Scan(&lastInsertId)
+	err = conn.QueryRow(CREATE_TICKET_STMT, email, topic, DEFAULT_TICKET_STATUS, text, DEFAULT_MSG_TYPE).Scan(&lastInsertId)
 	return lastInsertId, err
 }
 
@@ -82,4 +86,8 @@ func UpdateTicket(conn *sql.DB, id, status string) bool {
 		return false
 	}
 	return true
+}
+
+func GetMessagesForTicket(conn *sql.DB, id string) []Message {
+	return nil
 }

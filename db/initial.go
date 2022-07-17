@@ -27,18 +27,22 @@ const (
 		CONSTRAINT pk_users PRIMARY KEY (id)
 	);`
 	createStatusTypeStmt = `
-	CREATE OR REPLACE FUNCTION create_ticket_status_type() RETURNS integer AS $$
+	CREATE OR REPLACE FUNCTION create_types() RETURNS integer AS $$
 	DECLARE type_already_exists INTEGER;
 		BEGIN
 			SELECT into type_already_exists (SELECT 1 FROM pg_type WHERE typname = 'status');
 			IF type_already_exists IS NULL THEN
 				CREATE TYPE status AS ENUM ('resolved', 'unresolved', 'pending', 'canceled');
 			END IF;
+			SELECT into type_already_exists (SELECT 1 FROM pg_type WHERE typname = 'msg_type');
+			IF type_already_exists IS NULL THEN
+				CREATE TYPE msg_type AS ENUM ('request', 'response', 'other');
+			END IF;
 			RETURN type_already_exists;
 		END;
 		$$ LANGUAGE plpgsql;
-	SELECT create_ticket_status_type();
-	DROP function create_ticket_status_type();`
+	SELECT create_types();
+	DROP function create_types();`
 
 	CREATE_TABLE_TICKETS_STMT = `
 	CREATE TABLE IF NOT EXISTS tickets
@@ -57,6 +61,7 @@ const (
 	(
 		id SERIAL,
 		created_at TIMESTAMP DEFAULT now(),
+		type MSG_TYPE,
 		author VARCHAR(64) REFERENCES users (email) ON DELETE CASCADE,
 		text TEXT,
 		ticket INTEGER REFERENCES tickets (id) ON DELETE CASCADE,

@@ -25,7 +25,6 @@ type TicketDetails struct {
 }
 
 // Methods: GET/POST; path: /tickets
-
 func (h *BaseHandler) TicketsListAllOrCreateOne(w http.ResponseWriter, authReq *AuthenticatedRequest) {
 	switch authReq.Method {
 	case "GET":
@@ -118,6 +117,7 @@ func (h *BaseHandler) TicketsDetailedView(res http.ResponseWriter, authReq *Auth
 		ticketId := strings.Split(authReq.URL.Path, "/")[ID_POSITION_IN_URL_PATH]
 		switch {
 		case authReq.Method == "GET":
+			fmt.Println(ticketId)
 			return
 		case authReq.Method == "POST":
 			return

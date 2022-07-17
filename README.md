@@ -193,8 +193,9 @@ Moreover, the staff are not allowed to call the ticket "resolved" unless at leas
 registered for this tickets.
 
 ### Messaging
-When the ticket is first registered, its text goes to the messages table. Each message in this relation
-references a user (via email) and a ticket (pk).
+Each message in this relation references a user (via email) and a ticket (pk). 
+A message has got a message type: one of "request", "response", "other". 
+When a ticket is first registered, its text goes to the messages table as a message of type "request".
 
 To get the conversation on a certain ticket the users goes for:
 ```
