@@ -4,6 +4,7 @@ import (
 	"db-queries/db"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/lib/pq"
 )
@@ -13,11 +14,13 @@ type TicketDetails struct {
 	Text  string `json:"text"`
 }
 
+// Methods: GET/POST; path: /tickets
+
 func (h *BaseHandler) TicketsListAllOrCreateOne(w http.ResponseWriter, authReq *AuthenticatedRequest) {
-	switch {
-	case authReq.Method == "GET":
+	switch authReq.Method {
+	case "GET":
 		h.GetAllTickets(w, authReq)
-	case authReq.Method == "POST":
+	case "POST":
 		h.CreateTicket(w, authReq)
 	default:
 		http.Error(w, "Method Not Allowed.", http.StatusMethodNotAllowed)
@@ -70,4 +73,27 @@ func (h *BaseHandler) CreateTicket(w http.ResponseWriter, authReq *Authenticated
 	resp := make(map[string]int)
 	resp["id"] = id
 	json.NewEncoder(w).Encode(resp)
+}
+
+// Methods: GET/PUT/PATCH; path: /tickets/{id}
+
+func (h *BaseHandler) TicketsGetOrUpdateOne(w http.ResponseWriter, authReq *AuthenticatedRequest) {
+	idInQuery := strings.TrimPrefix(authReq.URL.Path, "/tickets/")
+	switch authReq.Method {
+	case "GET":
+		h.GetOneTicket(idInQuery, w, authReq)
+	default:
+		http.Error(w, "Method Not Allowed.", http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *BaseHandler) GetOneTicket(id string, w http.ResponseWriter, authReq *AuthenticatedRequest) {
+	ticket, err := db.GetOneTicketForUser(h.Conn, id, authReq.user.Email, authReq.user.IsStaff, authReq.user.IsSuperuser)
+	if err != nil {
+		http.Error(w, "Ticket does not exist or does not belong to this user.", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(ticket)
 }

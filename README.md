@@ -135,9 +135,9 @@ Response:
     },
 ]
 ```
-Other possible responses: 405 Method Not Allowed || 401 Unauthorized (no or invalid jwt) || || 500 Internal Server Error (err when reading from the database)
+Other possible responses: 405 Method Not Allowed || 401 Unauthorized (no or invalid jwt) || 500 Internal Server Error (err when reading from the database)
 
-To get info on a particular ticket the users hits.
+To retrieve info on a particular ticket the users hits:
 ```
 GET /tickets/{id}
 ```

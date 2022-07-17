@@ -16,13 +16,15 @@ const (
     INSERT INTO messages (author, ticket, text) 
 	VALUES ($1, (SELECT id FROM insert_to_tickets), $4) RETURNING id;
 `
+	GET_TICKET_STMT              = "SELECT created_at, updated_at, author, topic, status FROM tickets WHERE id=$1"
+	GET_TICKET_OF_THIS_USER_STMT = "SELECT created_at, updated_at, topic, status FROM tickets WHERE id=$1 and author=$2"
 )
 
 type Ticket struct {
 	ID     int       `json:"id"`
 	CrtdAt time.Time `json:"created_at"`
 	UpdAt  time.Time `json:"updated_at"`
-	Author string    `json:"author"`
+	Author string    `json:"author,omitempty"`
 	Topic  string    `json:"topic"`
 	Status string    `json:"status"`
 }
@@ -57,4 +59,14 @@ func GetTicketsForUser(conn *sql.DB, email string, isStaff, isSuperuser bool) (t
 		tickets = append(tickets, ticket)
 	}
 	return tickets, nil
+}
+
+func GetOneTicketForUser(conn *sql.DB, id, email string, isStaff, isSuperuser bool) (ticket Ticket, err error) {
+	switch {
+	case isStaff || isSuperuser:
+		err = conn.QueryRow(GET_TICKET_STMT, id).Scan(&ticket.CrtdAt, &ticket.UpdAt, &ticket.Author, &ticket.Topic, &ticket.Status)
+	default:
+		err = conn.QueryRow(GET_TICKET_OF_THIS_USER_STMT, id, email).Scan(&ticket.CrtdAt, &ticket.UpdAt, &ticket.Topic, &ticket.Status)
+	}
+	return ticket, err
 }
