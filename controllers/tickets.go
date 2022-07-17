@@ -3,10 +3,19 @@ package controllers
 import (
 	"db-queries/db"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/lib/pq"
+)
+
+const ID_POSITION_IN_URL_PATH = 2
+
+var (
+	ticketOperationRegex, _ = regexp.Compile("^/tickets/[0-9]+[/]?$")
+	msgOperationRegex, _    = regexp.Compile("^/tickets/[0-9]+/messages[/]?$")
 )
 
 type TicketDetails struct {
@@ -76,34 +85,48 @@ func (h *BaseHandler) CreateTicket(w http.ResponseWriter, authReq *Authenticated
 	json.NewEncoder(w).Encode(resp)
 }
 
-// Methods: GET/PUT/PATCH; path: /tickets/{id}
+func (h *BaseHandler) TicketsDetailedView(res http.ResponseWriter, authReq *AuthenticatedRequest) {
+	// Methods: GET/PUT/PATCH; path: /tickets/{id}
+	if ticketOperationRegex.MatchString(authReq.URL.Path) {
+		ticketId := strings.Split(authReq.URL.Path, "/")[ID_POSITION_IN_URL_PATH]
+		switch {
+		case authReq.Method == "GET":
+			h.GetOneTicket(ticketId, res, authReq)
 
-func (h *BaseHandler) TicketsGetOrUpdateOne(res http.ResponseWriter, authReq *AuthenticatedRequest) {
-	idInQuery := strings.TrimPrefix(authReq.URL.Path, "/tickets/")
+		case authReq.Method == "PUT" || authReq.Method == "PATCH":
+			var ticket TicketDetails
+			err := json.NewDecoder(authReq.Body).Decode(&ticket)
+			if err != nil {
+				http.Error(res, "Invalid payload.", http.StatusBadRequest)
+				return
+			}
+			validChangeByStaff := (authReq.user.IsStaff || authReq.user.IsSuperuser) && db.VALID_TICKET_STATUS_STAFF[ticket.Status]
+			validChangeByCommonUser := !(authReq.user.IsStaff || authReq.user.IsSuperuser) && db.VALID_TICKET_STATUS_COMMON_USER[ticket.Status]
+			if validChangeByStaff || validChangeByCommonUser {
+				h.UpdateTicket(ticketId, ticket.Status, res, authReq)
+				return
+			}
+			http.Error(res, "Invalid status.", http.StatusBadRequest)
 
-	switch {
-
-	case authReq.Method == "GET":
-		h.GetOneTicket(idInQuery, res, authReq)
-
-	case authReq.Method == "PUT" || authReq.Method == "PATCH":
-		var ticket TicketDetails
-		err := json.NewDecoder(authReq.Body).Decode(&ticket)
-		if err != nil {
-			http.Error(res, "Invalid payload.", http.StatusBadRequest)
-			return
+		default:
+			http.Error(res, "Method Not Allowed.", http.StatusMethodNotAllowed)
 		}
-		validChangeByStaff := (authReq.user.IsStaff || authReq.user.IsSuperuser) && db.VALID_TICKET_STATUS_STAFF[ticket.Status]
-		validChangeByCommonUser := !(authReq.user.IsStaff || authReq.user.IsSuperuser) && db.VALID_TICKET_STATUS_COMMON_USER[ticket.Status]
-		if validChangeByStaff || validChangeByCommonUser {
-			h.UpdateTicket(idInQuery, ticket.Status, res, authReq)
-			return
-		}
-		http.Error(res, "Invalid status.", http.StatusBadRequest)
-
-	default:
-		http.Error(res, "Method Not Allowed.", http.StatusMethodNotAllowed)
+		return
 	}
+	// Methods: GET/POST; path /tickets/{id}/messages
+	if msgOperationRegex.MatchString(authReq.URL.Path) {
+		ticketId := strings.Split(authReq.URL.Path, "/")[ID_POSITION_IN_URL_PATH]
+		switch {
+		case authReq.Method == "GET":
+			return
+		case authReq.Method == "POST":
+			return
+		default:
+			http.Error(res, "Method Not Allowed.", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+	http.Error(res, "", http.StatusBadRequest)
 }
 
 func (h *BaseHandler) GetOneTicket(id string, w http.ResponseWriter, authReq *AuthenticatedRequest) {

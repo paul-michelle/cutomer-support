@@ -52,7 +52,7 @@ func main() {
 	http.HandleFunc("/users", h.UsersListAllOrCreateOne)
 	http.HandleFunc("/login", h.LogIn)
 	http.Handle("/tickets", controllers.JWTMiddleWare(h.TicketsListAllOrCreateOne))
-	http.Handle("/tickets/", controllers.JWTMiddleWare(h.TicketsGetOrUpdateOne))
+	http.Handle("/tickets/", controllers.JWTMiddleWare(h.TicketsDetailedView))
 
 	log.Println("Initializing HTTP server.")
 	host := GetEnv("SERVER_HOST", "127.0.0.1")

@@ -198,8 +198,14 @@ references a user (via email) and a ticket (pk).
 
 To get the conversation on a certain ticket the users goes for:
 ```
-GET /tickets/{id}
+GET /tickets/{id}/messages
 ```
+
+To add a new 
+```
+
+```
+
 ### Flow
 If not specified, jwt needed for actions.
 
