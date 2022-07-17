@@ -7,8 +7,8 @@ import (
 
 const (
 	DEFAULT_TICKET_STATUS         = "pending"
-	GET_TICKETS_OF_THIS_USER_STMT = "SELECT * FROM tickets WHERE author=$1 ORDER BY created_at ASC"
-	GET_ALL_TICKETS_STMT          = "SELECT * FROM tickets ORDER BY created_at ASC"
+	GET_ALL_TICKETS_STMT          = "SELECT id, created_at, updated_at, author, topic, status FROM tickets ORDER BY created_at ASC"
+	GET_TICKETS_OF_THIS_USER_STMT = "SELECT id, created_at, updated_at, topic, status FROM tickets WHERE author=$1 ORDER BY created_at ASC"
 	CREATE_TICKET_STMT            = `
 	WITH insert_to_tickets AS 
 	(INSERT INTO tickets (author, topic, status) 
@@ -18,10 +18,11 @@ const (
 `
 	GET_TICKET_STMT              = "SELECT created_at, updated_at, author, topic, status FROM tickets WHERE id=$1"
 	GET_TICKET_OF_THIS_USER_STMT = "SELECT created_at, updated_at, topic, status FROM tickets WHERE id=$1 and author=$2"
+	UPDATE_TICKET_STMT           = "UPDATE tickets SET status=$2 WHERE id=$1"
 )
 
 type Ticket struct {
-	ID     int       `json:"id"`
+	ID     int       `json:"id,omitempty"`
 	CrtdAt time.Time `json:"created_at"`
 	UpdAt  time.Time `json:"updated_at"`
 	Author string    `json:"author,omitempty"`
@@ -39,19 +40,23 @@ func GetTicketsForUser(conn *sql.DB, email string, isStaff, isSuperuser bool) (t
 	switch {
 	case isStaff || isSuperuser:
 		rows, err = conn.Query(GET_ALL_TICKETS_STMT)
-		if err != nil {
-			return tickets, err
-		}
 	default:
 		rows, err = conn.Query(GET_TICKETS_OF_THIS_USER_STMT, email)
-		if err != nil {
-			return tickets, err
-		}
+	}
+
+	if err != nil {
+		return tickets, err
 	}
 
 	for rows.Next() {
 		var ticket Ticket
-		err := rows.Scan(&ticket.ID, &ticket.CrtdAt, &ticket.UpdAt, &ticket.Author, &ticket.Topic, &ticket.Status)
+		switch {
+		case isStaff || isSuperuser:
+			err = rows.Scan(&ticket.ID, &ticket.CrtdAt, &ticket.UpdAt, &ticket.Author, &ticket.Topic, &ticket.Status)
+		default:
+			err = rows.Scan(&ticket.ID, &ticket.CrtdAt, &ticket.UpdAt, &ticket.Topic, &ticket.Status)
+		}
+
 		if err != nil {
 			return tickets, err
 		}
@@ -69,4 +74,12 @@ func GetOneTicketForUser(conn *sql.DB, id, email string, isStaff, isSuperuser bo
 		err = conn.QueryRow(GET_TICKET_OF_THIS_USER_STMT, id, email).Scan(&ticket.CrtdAt, &ticket.UpdAt, &ticket.Topic, &ticket.Status)
 	}
 	return ticket, err
+}
+
+func UpdateTicket(conn *sql.DB, id, status string) bool {
+	exeResults, err := conn.Exec(UPDATE_TICKET_STMT, id, status)
+	if rowsAffected, _ := exeResults.RowsAffected(); rowsAffected == 0 || err != nil {
+		return false
+	}
+	return true
 }

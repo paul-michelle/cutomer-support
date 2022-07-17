@@ -33,7 +33,7 @@ Authorization: Bearer <Secret here>
     "isStaff": true
 }
 ```
-201 Created || 405 Method Not Allowed || 401 Unauthorized (when creating stuff member) || 400 Bad Request with error details.
+201 Created || 401 Unauthorized (when creating stuff member) || 405 Method Not Allowed || 400 Bad Request with error details.
 
 Is is only a staff member or a superuser who can get the list of all users (ordered DESC by the number of submitted tickets) via:
 ```
@@ -70,7 +70,7 @@ Status 200 OK
     }
 ]
 ```
-In case of failure: 405 Method Not Allowed || 401 Unauthorized (if not isStaff or isSuperuser) ||500 Internal Server Error (error reading from the database)
+In case of failure: 401 Unauthorized (if not isStaff or isSuperuser) || 405 Method Not Allowed || 500 Internal Server Error (error reading from the database)
 
 #### Superuser considerations
 For safety reasons, any other fields added to the request body, incl. isSuperuser, will be ignored.
@@ -89,9 +89,9 @@ POST /users
     "password": "atLeastEightChars",
 }
 ```
-200 OK || 405 Method Not Allowed || 404 Not Found || 400 Bad Request || 500 Internal Server Error (jwt string creation issue, user is asked to retry)
+200 OK || 405 Method Not Allowed || 404 Not Found || 400 Bad Request || 500 Internal Server Error (jwt token string creation issue, user is asked to retry)
 
-### Tickets
+### Tickets (creating and retrieving)
 To create a ticket user needs to send a POST request to /tickets specifying topic (< 20 chars) and text:
 ```
 POST /tickets
@@ -107,9 +107,9 @@ Succesful response:
     "id": 10
 }
 ```
-Other possible responses: 405 Method Not Allowed || 401 Unauthorized (no or invalid jwt) || 400 Bad Request with error details || 500 Internal Server Error (error when writing to the db.)
+Other possible responses: 401 Unauthorized (no or invalid jwt) || 405 Method Not Allowed || 400 Bad Request with error details || 500 Internal Server Error (error when writing to the db.)
 
-To get all the tickets (all user's tickets for common user and a list of all existing tickets for staff member of superuser):
+To get all the tickets (all user's tickets for common user VS a list of all existing tickets for staff member of superuser):
 ```
 GET /tickets
 ```
@@ -121,7 +121,7 @@ Response:
         "id": 1,
         "created_at": "2022-07-16T07:12:30.676834Z",
         "updated_at": "2022-07-16T07:12:30.676834Z",
-        "author": "postman33@mpost.io",
+        "author": "postman33@mpost.io", // specified only if it's a request from staff
         "topic": "new instances",
         "status": "pending"
     },
@@ -129,30 +129,69 @@ Response:
         "id": 2,
         "created_at": "2022-07-16T07:13:58.008489Z",
         "updated_at": "2022-07-16T07:13:58.008489Z",
-        "author": "postman33@mpost.io",
+        "author": "postman33@mpost.io", // specified only if it's a request from staff
         "topic": "new discount",
         "status": "pending"
     },
 ]
 ```
-Other possible responses: 405 Method Not Allowed || 401 Unauthorized (no or invalid jwt) || 500 Internal Server Error (err when reading from the database)
+Other possible responses: 401 Unauthorized (jwt issues) || 405 Method Not Allowed || 500 Internal Server Error (err when reading from the database)
 
 To retrieve info on a particular ticket the users hits:
 ```
 GET /tickets/{id}
 ```
-In case the ticket exists and belongs to the user (or in case it is a  request from a staff member):
+In case the ticket exists and the user has got enough permissions to retrieve it:
 ```
-COMPLETE ME!!!
+Status 200 OK
+{
+    "created_at": "2022-07-16T07:14:31.672847Z",
+    "updated_at": "2022-07-16T07:14:31.672847Z",
+    "topic": "a somewhat complaint",
+    "status": "pending"
+}
 ```
+Again, as it is the case with listing all the tickets, in case it is a request from a staff memeber, ticket's author also specified
+in response body:
+```
+Status 200 OK
+{
+    "created_at": "2022-07-16T07:14:31.672847Z",
+    "updated_at": "2022-07-16T07:14:31.672847Z",
+    "author": "postman33@mpost.io",
+    "topic": "third from postman33",
+    "status": "pending"
+}
+```
+Other possible responses: 401 Unauthorized (no or invalid jwt) || 405 Method Not Allowed || 404 Not Found.
 
-To change ticket status to "resolved" (which is the ONLY update that can be done to a ticket remotely):
+### Tickets (updating)
+A common user can recall the ticket opened by them:
+```
+PUT/PATCH /tickets/{id}
+{
+    "status": "canceled"
+}
+```
+Response in case of success is 200 OK. Failures:  401 Unauthorized || 405 Method Not Allowed || 404 Not Found || 400 Bad Request (when user tries to assign an invalid status to the ticket).
+
+Changing the ticket's status, a staff member can choose among "pending", "resolved", "unresolved", e.g.:
 ```
 PUT/PATCH /tickets/{id}
 {
     "status": "resolved"
 }
 ```
+Response in case of success is 200 OK. Failures:  401 Unauthorized || 405 Method Not Allowed || 404 Not Found || 400 Bad Request (when user tries to assign an invalid status to the ticket, including the "canceled" one - see considerations below).
+
+### Tickets status considerations
+A ticket status can be one of the following: "pending" (default), "resolved", "unresolved", "canceled".
+Is is only the ticket's author, who can 'close' the ticket via changing its status to "canceled".
+The staff members, in their turn, can change the ticket's status to and from "pending", "resolved", "unresolved".
+
+Moreover, the staff are not allowed to call the ticket "resolved" unless at least one response message has been
+registered for this tickets.
+
 ### Messaging
 When the ticket is first registered, its text goes to the messages table. Each message in this relation
 references a user (via email) and a ticket (pk).
@@ -161,14 +200,6 @@ To get the conversation on a certain ticket the users goes for:
 ```
 GET /tickets/{id}
 ```
-
-### Tickets status considerations
-Since the ticket status is the main benchmark of the whole logic, the staff members should not 
-be allowed to call the ticket "resolved" unless a response message from a staff member has been
-registered for this tickets.
-
-The ticket's author, on the contrary, may 'close' the ticket at any point of time.
-
 ### Flow
 If not specified, jwt needed for actions.
 

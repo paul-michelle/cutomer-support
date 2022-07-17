@@ -10,8 +10,9 @@ import (
 )
 
 type TicketDetails struct {
-	Topic string `json:"topic"`
-	Text  string `json:"text"`
+	Topic  string `json:"topic"`
+	Text   string `json:"text"`
+	Status string `json:"status,omitempty"`
 }
 
 // Methods: GET/POST; path: /tickets
@@ -77,13 +78,31 @@ func (h *BaseHandler) CreateTicket(w http.ResponseWriter, authReq *Authenticated
 
 // Methods: GET/PUT/PATCH; path: /tickets/{id}
 
-func (h *BaseHandler) TicketsGetOrUpdateOne(w http.ResponseWriter, authReq *AuthenticatedRequest) {
+func (h *BaseHandler) TicketsGetOrUpdateOne(res http.ResponseWriter, authReq *AuthenticatedRequest) {
 	idInQuery := strings.TrimPrefix(authReq.URL.Path, "/tickets/")
-	switch authReq.Method {
-	case "GET":
-		h.GetOneTicket(idInQuery, w, authReq)
+
+	switch {
+
+	case authReq.Method == "GET":
+		h.GetOneTicket(idInQuery, res, authReq)
+
+	case authReq.Method == "PUT" || authReq.Method == "PATCH":
+		var ticket TicketDetails
+		err := json.NewDecoder(authReq.Body).Decode(&ticket)
+		if err != nil {
+			http.Error(res, "Invalid payload.", http.StatusBadRequest)
+			return
+		}
+		validChangeByStaff := (authReq.user.IsStaff || authReq.user.IsSuperuser) && db.VALID_TICKET_STATUS_STAFF[ticket.Status]
+		validChangeByCommonUser := !(authReq.user.IsStaff || authReq.user.IsSuperuser) && db.VALID_TICKET_STATUS_COMMON_USER[ticket.Status]
+		if validChangeByStaff || validChangeByCommonUser {
+			h.UpdateTicket(idInQuery, ticket.Status, res, authReq)
+			return
+		}
+		http.Error(res, "Invalid status.", http.StatusBadRequest)
+
 	default:
-		http.Error(w, "Method Not Allowed.", http.StatusMethodNotAllowed)
+		http.Error(res, "Method Not Allowed.", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -96,4 +115,11 @@ func (h *BaseHandler) GetOneTicket(id string, w http.ResponseWriter, authReq *Au
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(ticket)
+}
+
+func (h *BaseHandler) UpdateTicket(id, status string, res http.ResponseWriter, authReq *AuthenticatedRequest) {
+	if !db.UpdateTicket(h.Conn, id, status) {
+		http.Error(res, "Ticket does not exist or does not belong to this user.", http.StatusNotFound)
+		return
+	}
 }

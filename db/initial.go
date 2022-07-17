@@ -32,7 +32,7 @@ const (
 		BEGIN
 			SELECT into type_already_exists (SELECT 1 FROM pg_type WHERE typname = 'status');
 			IF type_already_exists IS NULL THEN
-				CREATE TYPE status AS ENUM ('resolved', 'unresolved', 'pending', 'unknown');
+				CREATE TYPE status AS ENUM ('resolved', 'unresolved', 'pending', 'canceled');
 			END IF;
 			RETURN type_already_exists;
 		END;
@@ -64,6 +64,18 @@ const (
 	);`
 	VALUE_TOO_LONG_ERR_CODE_NAME   = "string_data_right_truncation"
 	UNIQUE_VIOLATION_ERR_CODE_NAME = "unique_violation"
+)
+
+var (
+	VALID_STATUSES                  = []string{"resolved", "unresolved", "canceled", "pending"}
+	VALID_TICKET_STATUS_COMMON_USER = map[string]bool{
+		"canceled": true,
+	}
+	VALID_TICKET_STATUS_STAFF = map[string]bool{
+		"resolved":   true,
+		"unresolved": true,
+		"pending":    true,
+	}
 )
 
 func Initialize(dsn *DSN) (*sql.DB, error) {
