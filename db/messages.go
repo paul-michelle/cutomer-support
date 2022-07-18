@@ -7,6 +7,7 @@ import (
 
 const (
 	GET_MESSAGES_FOR_TICKET_STMT = "SELECT created_at, type, text FROM messages WHERE ticket=$1"
+	ADD_MESSAGE_TO_TICKET_STMT   = "INSERT INTO messages (type, author, text, ticket) VALUES ($1, $2, $3, $4)"
 )
 
 type Message struct {
@@ -34,4 +35,17 @@ func GetMessagesForTicket(conn *sql.DB, ticketId string) ([]Message, error) {
 		msgs = append(msgs, msg)
 	}
 	return msgs, nil
+}
+
+func AddMessage(conn *sql.DB, msgType, author, ticketId, text string) bool {
+	exeResults, err := conn.Exec(ADD_MESSAGE_TO_TICKET_STMT, msgType, author, text, ticketId)
+	if err != nil {
+		return false
+	}
+
+	if rowsAffected, _ := exeResults.RowsAffected(); rowsAffected == 0 {
+		return false
+	}
+
+	return true
 }

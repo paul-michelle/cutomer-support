@@ -79,8 +79,13 @@ func GetOneTicketForUser(conn *sql.DB, id, email string, isStaff, isSuperuser bo
 
 func UpdateTicket(conn *sql.DB, id, status string) bool {
 	exeResults, err := conn.Exec(UPDATE_TICKET_STMT, id, status)
-	if rowsAffected, _ := exeResults.RowsAffected(); rowsAffected == 0 || err != nil {
+	if err != nil {
 		return false
 	}
+
+	if rowsAffected, _ := exeResults.RowsAffected(); rowsAffected == 0 {
+		return false
+	}
+
 	return true
 }

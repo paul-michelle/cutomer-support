@@ -197,7 +197,11 @@ Each message in this relation references a user (via email) and a ticket (pk).
 A message has got a message type: one of "request", "response", "other". 
 When a ticket is first registered, its text goes to the messages table as a message of type "request".
 
-To get the conversation on a certain ticket the users goes for: GET /tickets/{id}/messages.
+To get the messages on a certain ticket the users goes for: 
+```
+GET /tickets/{id}/messages.
+```
+A successful response will be:
 ```
 200 OK
 [
@@ -210,23 +214,75 @@ To get the conversation on a certain ticket the users goes for: GET /tickets/{id
 ```
 Other possible responses: 401 Unauthorized (no or invalid jwt) || 405 Method Not Allowed || 404 Not Found.
 
-
+To add another message to the ticket, the user calls: 
 ```
+POST /tickets/{id}/messages
+{
+    "text": "another message here..."
+}
+```
+If the message has been sucessfully registered at the back-end, the reponse will be:
+```
+201 Created
+```
+Other possible responses: 401 Unauthorized (no or invalid jwt) || 405 Method Not Allowed || 400 Bad Request (missing or invalid payload) || 404 Not Found (ticket not found)
 
+*NB!* If a message is coming from a common user, it is registered as of type "request", while the one from a staff member is
+considered to be of type "response".
+
+At the end of the day, the messaging regarding a ticket will be looking like this, when a user calls GET /tickets/{id}/messages:
+```
+[
+    {
+        "created_at": "2022-07-17T19:00:44.314775Z",
+        "type": "request",
+        "text": "I need to know now..."
+    },
+    {
+        "created_at": "2022-07-18T14:14:17.642316Z",
+        "type": "request",
+        "text": "I cannot wait any longer..."
+    },
+    {
+        "created_at": "2022-07-18T14:18:24.095642Z",
+        "type": "request",
+        "text": "Yet another message from a user!"
+    },
+    {
+        "created_at": "2022-07-18T14:22:43.930405Z",
+        "type": "response",
+        "text": "Hi there! Thanks for your patience..."
+    }
+]
 ```
 
 ### Flow
-If not specified, jwt needed for actions.
+NB! If not specified, jwt needed for actions.
+Let's role-play the communication:
 
 ##### For common user:
 1. Create a user: POST /users (no jwt)
 2. Login to set jwt token as cookie: POST /login (no jwt)
 3. Create a couple of tickets: POST /tickets
 4. List all tickets belonging to the user: GET /tickets
+5. Check messages for the tickets: GET /tickets/{id}/messages
+6. Write another message to a ticket: POST /tickets/{id}/messages
+7. Check messages again to make sure your recent message is there: GET /tickets/{id}/messages
+   
+   ...sleep till step 6 is done in the section below...
 
+8. Check messages again to see a response from the admin, if there's a question on whether the ticket can be closed - make a decision.
+9.  Alternatively, hit: PUT/PATCH: /tickets/{id}/ Payload {"status": "canceled"}
+    
 ##### For staff user:
 1. Create a user  isStaff set to true: POST /users (no jwt, but bearer token NB!)
 2. Login to set jwt token as cookie: POST /login (no jwt)
-3. List all the tickets: GET /tickets
-4. List all the users: GET /users
+3. List all the existing tickets: GET /tickets
+4. Pick up one ticket: GET /tickets/{id}
+5. See the messages to the ticket: GET /tickets/{id}/messages
+6. If the last message is of type 'request' and there' no mentioning that the ticket can be closed, add a message: POST /tickets/{id}/messages
+   
+   ...sleep till step 8 is done in the section above...
+
+7. If the user says, the ticket can be closed, hit: PUT/PATCH /tickets/{id}/ Payload {"status": "resolved"}
 

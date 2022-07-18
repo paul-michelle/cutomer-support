@@ -92,19 +92,7 @@ func (h *BaseHandler) TicketsDetailedView(res http.ResponseWriter, authReq *Auth
 			h.GetOneTicket(ticketId, res, authReq)
 
 		case authReq.Method == "PUT" || authReq.Method == "PATCH":
-			var ticket TicketDetails
-			err := json.NewDecoder(authReq.Body).Decode(&ticket)
-			if err != nil {
-				http.Error(res, "Invalid payload.", http.StatusBadRequest)
-				return
-			}
-			validChangeByStaff := (authReq.user.IsStaff || authReq.user.IsSuperuser) && db.VALID_TICKET_STATUS_STAFF[ticket.Status]
-			validChangeByCommonUser := !(authReq.user.IsStaff || authReq.user.IsSuperuser) && db.VALID_TICKET_STATUS_COMMON_USER[ticket.Status]
-			if validChangeByStaff || validChangeByCommonUser {
-				h.UpdateTicket(ticketId, ticket.Status, res, authReq)
-				return
-			}
-			http.Error(res, "Invalid status.", http.StatusBadRequest)
+			h.UpdateTicket(ticketId, res, authReq)
 
 		default:
 			http.Error(res, "Method Not Allowed.", http.StatusMethodNotAllowed)
@@ -118,7 +106,7 @@ func (h *BaseHandler) TicketsDetailedView(res http.ResponseWriter, authReq *Auth
 		case authReq.Method == "GET":
 			h.GetMessagesForTicket(ticketId, res, authReq)
 		case authReq.Method == "POST":
-			return
+			h.CreateMessage(ticketId, res, authReq)
 		default:
 			http.Error(res, "Method Not Allowed.", http.StatusMethodNotAllowed)
 		}
@@ -138,9 +126,21 @@ func (h *BaseHandler) GetOneTicket(id string, w http.ResponseWriter, authReq *Au
 	json.NewEncoder(w).Encode(ticket)
 }
 
-func (h *BaseHandler) UpdateTicket(id, status string, res http.ResponseWriter, authReq *AuthenticatedRequest) {
-	if !db.UpdateTicket(h.Conn, id, status) {
-		http.Error(res, "Ticket does not exist or does not belong to this user.", http.StatusNotFound)
+func (h *BaseHandler) UpdateTicket(id string, res http.ResponseWriter, authReq *AuthenticatedRequest) {
+	var ticket TicketDetails
+	err := json.NewDecoder(authReq.Body).Decode(&ticket)
+	if err != nil {
+		http.Error(res, "Invalid payload.", http.StatusBadRequest)
 		return
+	}
+	validChangeByStaff := (authReq.user.IsStaff || authReq.user.IsSuperuser) && db.VALID_TICKET_STATUS_STAFF[ticket.Status]
+	validChangeByCommonUser := !(authReq.user.IsStaff || authReq.user.IsSuperuser) && db.VALID_TICKET_STATUS_COMMON_USER[ticket.Status]
+	if !(validChangeByStaff || validChangeByCommonUser) {
+		http.Error(res, "Invalid status.", http.StatusBadRequest)
+		return
+	}
+
+	if !db.UpdateTicket(h.Conn, id, ticket.Status) {
+		http.Error(res, "Ticket does not exist or does not belong to this user.", http.StatusNotFound)
 	}
 }
