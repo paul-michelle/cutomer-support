@@ -286,3 +286,15 @@ Let's role-play the communication:
 
 7. If the user says, the ticket can be closed, hit: PUT/PATCH /tickets/{id}/ Payload {"status": "resolved"}
 
+
+### Further considerations
+
+Currently, a staff memeber can list all users: *GET /users*.
+The list of the users is ordered DESC by the number of tickets a user has opened.
+
+A staff member should be able to hit: *GET /users/{id}* to see the info on this user plus an
+embedded array of the tickets. Besides, there should be an option to *PATCH/PUT /users/id* to
+change some info on the user, say, user status (which is yet to be implemented).
+
+Having the users details (including the tickets), the staff member can grab a ticket id and
+move on to *GET /tickets/{id}* an so on...
