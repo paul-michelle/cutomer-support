@@ -23,17 +23,17 @@ func GetEnv(key, defaultValue string) string {
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Unable to parse .env file.")
+		log.Println("WARNING. Unable to parse .env file.")
 	}
-	var ()
+
 	log.Println("Initializing DB connection.")
 	conn, err := db.Initialize(
 		&db.DSN{
-			HOST:     os.Getenv("DB_HOST"),
-			PORT:     os.Getenv("DB_PORT"),
-			USERNAME: os.Getenv("DB_USER"),
-			PASSWORD: os.Getenv("DB_PASSWORD"),
-			DATABASE: os.Getenv("DB_NAME"),
+			HOST:     GetEnv("DB_HOST", "127.0.0.1"),
+			PORT:     GetEnv("DB_PORT", "5433"),
+			USERNAME: GetEnv("DB_USER", "postgres"),
+			PASSWORD: GetEnv("DB_PASSWORD", "postgres"),
+			DATABASE: GetEnv("DB_NAME", "tickets"),
 		},
 	)
 	if err != nil {

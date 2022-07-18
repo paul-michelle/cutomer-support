@@ -1,16 +1,30 @@
-### Dev
-Prepare a database instance:
+### Running the App
+
+Make sure you got [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/install/)
+installed on your machine.
+
+Clone the repo with *git clone git@github.com:paul-michelle/golang-sql.git*, move to the newly created directory and run:
 ```
-docker run --rm -d -p 127.0.0.1:5433:5432 -e POSTGRES_USER=... -e POSTGRES_PASSWORD=... -e POSTGRES_DB=... postgres:13-alpine
+$ docker-compose up -d
 ```
-Add a .env file to the project root, specifying DB_HOST=..., DB_PORT=..., DB_USER=..., DB_PASSWORD=..., DB_NAME=....
-The default server address will be "localhost:8089". Provide SERVER_HOST=... and SERVER_PORT=... values to change it. 
-Mind that variables from the docker run command should correspond to what is being provided in the .env file.
+Stop the containers, removing all the data (i.e. returning you to the position before they were launched) by:
+```
+$ docker-compose down -v
+```
+
+### Dev Setup
+Fow a quick start, prepare a database instance with development creds:
+```
+docker run --rm -d -p 127.0.0.1:5433:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=tickets postgres:13-alpine
+```
+Alternatively, add a .env file to the project root, specifying the params. The default server address will be "localhost:8089". 
 From the project root fire:
 ```
 go run .
 ```
 Make a ping request to http://localhost:8089/time to get the current time (open in the browser for quick check).
+
+Please find all the variables awaited from the environment in docker-compose file.
 
 ### Users
 Users are registered via an API call (POST /users) with the following info in request payload: unique email, at least 8 chars password, and username. 
