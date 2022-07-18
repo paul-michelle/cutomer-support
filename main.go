@@ -29,8 +29,8 @@ func main() {
 	log.Println("Initializing DB connection.")
 	conn, err := db.Initialize(
 		&db.DSN{
-			HOST:     GetEnv("DB_HOST", "127.0.0.1"),
-			PORT:     GetEnv("DB_PORT", "5433"),
+			HOST:     GetEnv("DB_HOST", "db"),
+			PORT:     GetEnv("DB_PORT", "5432"),
 			USERNAME: GetEnv("DB_USER", "postgres"),
 			PASSWORD: GetEnv("DB_PASSWORD", "postgres"),
 			DATABASE: GetEnv("DB_NAME", "tickets"),
@@ -55,7 +55,7 @@ func main() {
 	http.Handle("/tickets/", controllers.JWTMiddleWare(h.TicketsDetailedView))
 
 	log.Println("Initializing HTTP server.")
-	host := GetEnv("SERVER_HOST", "127.0.0.1")
+	host := GetEnv("SERVER_HOST", "0.0.0.0")
 	port := GetEnv("SERVER_PORT", "8089")
 	servAddr := fmt.Sprintf("%s:%s", host, port)
 	s := &http.Server{Addr: servAddr}

@@ -5,12 +5,13 @@ installed on your machine.
 
 Clone the repo with *git clone git@github.com:paul-michelle/golang-sql.git*, move to the newly created directory and run:
 ```
-$ docker-compose up -d
+JWT=jwtkey STAFF_TOKEN=stafftoken DB_USER=dbuser DB_PASSWORD=dbpassword DB_NAME=dbname docker-compose up
 ```
 Stop the containers, removing all the data (i.e. returning you to the position before they were launched) by:
 ```
 $ docker-compose down -v
 ```
+Use [Postman](https://www.postman.com/downloads/) - or any other tool of your preference - to execute API calls. Please see the flow section to quickly test the app.
 
 ### Dev Setup
 Fow a quick start, prepare a database instance with development creds:
