@@ -8,7 +8,7 @@ only standard libraries used.
 Make sure you got [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/install/)
 installed on your machine.
 
-Clone the repo with *git clone git@github.com:paul-michelle/golang-sql.git*, 
+Clone the repo with *git clone https://github.com/paul-michelle/cutomer-support.git*, 
 move to the newly created directory and hit *make build* and then *make run* to build and launch the app.
 Use *make start* to start the paused containers; *make stop* to stop the containers; 
 *make purge* to stop them and remove the data.
