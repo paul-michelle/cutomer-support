@@ -1,5 +1,10 @@
-### Running the App
+## Tickets service
+A customer support service based of opening a ticket, exchanging messages and, finally, changing the ticket's status.
+The info is stored in PostgreSQL. The app itself is written in Go. Apart from postgres driver, jwt library and dotenv file parser, 
+only standard libraries used.
 
+
+### Running the App
 Make sure you got [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/install/)
 installed on your machine.
 
