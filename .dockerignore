@@ -4,3 +4,4 @@ git
 misc.txt
 README.md
 Dockerfile
+docker-compose.yaml

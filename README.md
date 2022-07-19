@@ -3,29 +3,14 @@
 Make sure you got [docker](https://www.docker.com/) and [docker-compose](https://docs.docker.com/compose/install/)
 installed on your machine.
 
-Clone the repo with *git clone git@github.com:paul-michelle/golang-sql.git*, move to the newly created directory and run:
-```
-JWT=jwtkey STAFF_TOKEN=stafftoken DB_USER=dbuser DB_PASSWORD=dbpassword DB_NAME=dbname docker-compose up
-```
-Stop the containers, removing all the data (i.e. returning you to the position before they were launched) by:
-```
-$ docker-compose down -v
-```
-Use [Postman](https://www.postman.com/downloads/) - or any other tool of your preference - to execute API calls. Please see the flow section to quickly test the app.
+Clone the repo with *git clone git@github.com:paul-michelle/golang-sql.git*, 
+move to the newly created directory and hit *make build* and then *make run* to build and launch the app.
+Use *make start* to start the paused containers; *make stop* to stop the containers; 
+*make purge* to stop them and remove the data.
 
-### Dev Setup
-Fow a quick start, prepare a database instance with development creds:
-```
-docker run --rm -d -p 127.0.0.1:5433:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=tickets postgres:13-alpine
-```
-Alternatively, add a .env file to the project root, specifying the params. The default server address will be "localhost:8089". 
-From the project root fire:
-```
-go run .
-```
-Make a ping request to http://localhost:8089/time to get the current time (open in the browser for quick check).
-
-Please find all the variables awaited from the environment in docker-compose file.
+Use [Postman](https://www.postman.com/downloads/) - or any other tool of your preference - to execute API calls. 
+Please find the *flow* section at the end of this file to quickly test the app. 
+For all details - see the corresponding sections below.
 
 ### Users
 Users are registered via an API call (POST /users) with the following info in request payload: unique email, at least 8 chars password, and username. 
